@@ -1,0 +1,13 @@
+{
+  "name": "piano-trainer",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "PWA de lectura a primera vista: ejercicios generados y siempre nuevos, con escucha por microfono",
+  "scripts": {
+    "test": "node test-yin.mjs && node test-music.mjs",
+    "test:yin": "node test-yin.mjs",
+    "test:music": "node test-music.mjs",
+    "serve": "node serve.mjs"
+  }
+}

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#12141a" />
+  <title>Lectura a Primera Vista</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Lectura a primera vista</h1>
+    <p class="sub">Cada ejercicio es nuevo. No se puede memorizar — por eso la medición vale.</p>
+  </header>
+
+  <section class="controls">
+    <label class="field">
+      <span>Nivel</span>
+      <select id="level"></select>
+    </label>
+
+    <div class="modes">
+      <label><input type="radio" name="mode" id="mode-tap" checked /> Sin piano <em>(pantalla)</em></label>
+      <label><input type="radio" name="mode" id="mode-piano" /> Con piano <em>(micrófono)</em></label>
+    </div>
+
+    <div class="actions">
+      <button id="btn-start" class="primary">Empezar sesión</button>
+      <button id="btn-stop" class="danger" hidden>Terminar y guardar</button>
+    </div>
+  </section>
+
+  <div id="mic-panel" hidden>
+    <div class="level-meter"><div id="level-bar"></div></div>
+    <p id="mic-status" class="mic-status"></p>
+  </div>
+
+  <section class="score-wrap">
+    <div id="score" class="score-scroll"></div>
+    <div id="feedback" class="feedback"></div>
+    <p id="exercise-info" class="exercise-info"></p>
+  </section>
+
+  <div id="tap-pad" class="tap-pad"></div>
+
+  <section class="stats">
+    <div class="stat"><span class="label">Correctas</span><span class="value" id="stat-correct">0</span></div>
+    <div class="stat"><span class="label">Precisión</span><span class="value" id="stat-accuracy">—</span></div>
+    <div class="stat"><span class="label">Notas/min</span><span class="value" id="stat-npm">—</span></div>
+    <div class="stat"><span class="label">Latencia p90</span><span class="value" id="stat-p90">—</span></div>
+  </section>
+
+  <div id="gate" class="gate unknown"></div>
+  <p id="history" class="history"></p>
+
+  <footer>
+    <p>Meta de Fase 1: identificar cualquier nota de ambas claves en menos de 2 s, con 95% de acierto.</p>
+  </footer>
+
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>

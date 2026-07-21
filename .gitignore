@@ -1,0 +1,10 @@
+# Dependencias
+node_modules/
+
+# HTML intermedio que genera build_pdf.py (los PDF sí se versionan)
+build/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log

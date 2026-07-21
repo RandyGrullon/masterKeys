@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lectura",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["serve.mjs"],
+      "cwd": "app",
+      "port": 5174
+    }
+  ]
+}

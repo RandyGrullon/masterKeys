@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 340" width="880" height="340" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <style>
+    .nh   { fill:#8a8a8a; }
+    .nho  { fill:none; stroke:#8a8a8a; stroke-width:2.2; }
+    .stem { stroke:#8a8a8a; stroke-width:2.2; }
+    .beam { fill:#8a8a8a; }
+    .lbl  { fill:#8a8a8a; font-size:13px; text-anchor:middle; }
+    .cnt  { fill:#e05a5a; font-size:13px; text-anchor:middle; font-weight:700; }
+    .ttl  { fill:#8a8a8a; font-size:15px; font-weight:700; letter-spacing:1px; }
+    .sub  { fill:#3b8fe0; font-size:13px; font-weight:700; text-anchor:middle; }
+    .note { fill:#8a8a8a; font-size:13px; }
+    .div  { stroke:#8a8a8a; stroke-width:1; stroke-dasharray:4 5; }
+  </style>
+
+  <text class="ttl" x="30" y="28">DURACIÓN — el 90% de los errores de lectura son de ritmo, no de notas</text>
+
+  <!-- REDONDA -->
+  <ellipse class="nho" cx="110" cy="110" rx="12" ry="8.5" transform="rotate(-18 110 110)"/>
+  <text class="lbl" x="110" y="150">redonda</text>
+  <text class="sub" x="110" y="172">4 tiempos</text>
+  <text class="cnt" x="110" y="196">1 - 2 - 3 - 4</text>
+
+  <line class="div" x1="185" y1="70" x2="185" y2="210"/>
+
+  <!-- BLANCA -->
+  <ellipse class="nho" cx="250" cy="110" rx="11" ry="8" transform="rotate(-18 250 110)"/>
+  <line class="stem" x1="260" y1="107" x2="260" y2="48"/>
+  <text class="lbl" x="250" y="150">blanca</text>
+  <text class="sub" x="250" y="172">2 tiempos</text>
+  <text class="cnt" x="250" y="196">1 - 2</text>
+
+  <line class="div" x1="325" y1="70" x2="325" y2="210"/>
+
+  <!-- NEGRA -->
+  <ellipse class="nh" cx="390" cy="110" rx="11" ry="8" transform="rotate(-18 390 110)"/>
+  <line class="stem" x1="400" y1="107" x2="400" y2="48"/>
+  <text class="lbl" x="390" y="150">negra</text>
+  <text class="sub" x="390" y="172">1 tiempo</text>
+  <text class="cnt" x="390" y="196">1</text>
+
+  <line class="div" x1="465" y1="70" x2="465" y2="210"/>
+
+  <!-- CORCHEAS (par con barra) -->
+  <ellipse class="nh" cx="530" cy="110" rx="11" ry="8" transform="rotate(-18 530 110)"/>
+  <ellipse class="nh" cx="580" cy="110" rx="11" ry="8" transform="rotate(-18 580 110)"/>
+  <line class="stem" x1="540" y1="107" x2="540" y2="50"/>
+  <line class="stem" x1="590" y1="107" x2="590" y2="50"/>
+  <rect class="beam" x="539" y="48" width="52" height="6"/>
+  <text class="lbl" x="560" y="150">corcheas</text>
+  <text class="sub" x="560" y="172">½ tiempo c/u</text>
+  <text class="cnt" x="560" y="196">1 - y</text>
+
+  <line class="div" x1="645" y1="70" x2="645" y2="210"/>
+
+  <!-- SEMICORCHEAS (grupo de 4, doble barra) -->
+  <ellipse class="nh" cx="700" cy="110" rx="11" ry="8" transform="rotate(-18 700 110)"/>
+  <ellipse class="nh" cx="740" cy="110" rx="11" ry="8" transform="rotate(-18 740 110)"/>
+  <ellipse class="nh" cx="780" cy="110" rx="11" ry="8" transform="rotate(-18 780 110)"/>
+  <ellipse class="nh" cx="820" cy="110" rx="11" ry="8" transform="rotate(-18 820 110)"/>
+  <line class="stem" x1="710" y1="107" x2="710" y2="50"/>
+  <line class="stem" x1="750" y1="107" x2="750" y2="50"/>
+  <line class="stem" x1="790" y1="107" x2="790" y2="50"/>
+  <line class="stem" x1="830" y1="107" x2="830" y2="50"/>
+  <rect class="beam" x="709" y="48" width="122" height="6"/>
+  <rect class="beam" x="709" y="60" width="122" height="6"/>
+  <text class="lbl" x="770" y="150">semicorcheas</text>
+  <text class="sub" x="770" y="172">¼ tiempo c/u</text>
+  <text class="cnt" x="770" y="196">1 - e - y - a</text>
+
+  <text class="note" x="30" y="248">El puntillo (♩.) añade la MITAD del valor: negra con puntillo = 1½ tiempos. Aparece constantemente en Piano Man y en Howl's.</text>
+  <text class="note" x="30" y="276">Compás 3/4 (vals) = 3 negras por compás. Es el compás de LAS TRES piezas que quieres. Acostúmbrate a contar «UN - dos - tres» con acento en el 1.</text>
+  <text class="note" x="30" y="304">Protocolo: antes de tocar un compás nuevo, PALMÉALO contando en voz alta. Si no lo puedes palmear, no lo puedes tocar.</text>
+</svg>

@@ -1,0 +1,14 @@
+{
+  "name": "Lectura a Primera Vista",
+  "short_name": "Lectura",
+  "description": "Entrenador de lectura de partitura con ejercicios siempre nuevos",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#12141a",
+  "theme_color": "#12141a",
+  "icons": [
+    { "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

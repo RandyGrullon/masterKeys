@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 320" width="880" height="320" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <style>
+    .ln  { stroke:#8a8a8a; stroke-width:1.4; }
+    .bar { stroke:#8a8a8a; stroke-width:3; }
+    .nh  { fill:#8a8a8a; }
+    .acc { fill:#e05a5a; }
+    .lbl { fill:#8a8a8a; font-size:13px; text-anchor:middle; }
+    .big { fill:#3b8fe0; font-size:15px; font-weight:700; text-anchor:middle; }
+    .ttl { fill:#8a8a8a; font-size:15px; font-weight:700; letter-spacing:1px; }
+    .clef{ fill:#8a8a8a; font-size:66px; font-family:"Segoe UI Symbol","Bravura","Noto Music",serif; }
+    .note{ fill:#8a8a8a; font-size:13px; }
+  </style>
+
+  <text class="ttl" x="30" y="28">LEER POR DISTANCIA, NO POR NOMBRE — esto es lo que te da velocidad</text>
+
+  <!-- staff lines y = 90,110,130,150,170 -->
+  <g class="ln">
+    <line x1="120" y1="90"  x2="850" y2="90"/>
+    <line x1="120" y1="110" x2="850" y2="110"/>
+    <line x1="120" y1="130" x2="850" y2="130"/>
+    <line x1="120" y1="150" x2="850" y2="150"/>
+    <line x1="120" y1="170" x2="850" y2="170"/>
+  </g>
+  <text class="clef" x="128" y="168">&#119070;</text>
+  <text class="lbl" x="152" y="192" font-size="11">clave de SOL</text>
+  <line class="bar" x1="120" y1="90" x2="120" y2="170"/>
+  <line class="bar" x1="848" y1="90" x2="848" y2="170"/>
+
+  <!-- pair 1: 2nd — line to adjacent space (170 -> 160) -->
+  <ellipse class="nh"  cx="240" cy="170" rx="9.5" ry="6.8" transform="rotate(-18 240 170)"/>
+  <ellipse class="acc" cx="278" cy="160" rx="9.5" ry="6.8" transform="rotate(-18 278 160)"/>
+  <text class="big" x="259" y="222">2ª</text>
+  <text class="lbl" x="259" y="242">línea → espacio</text>
+  <text class="lbl" x="259" y="259">vecino</text>
+  <text class="lbl" x="259" y="278">= tecla de al lado</text>
+
+  <!-- pair 2: 3rd — line to next line (170 -> 150) -->
+  <ellipse class="nh"  cx="400" cy="170" rx="9.5" ry="6.8" transform="rotate(-18 400 170)"/>
+  <ellipse class="acc" cx="438" cy="150" rx="9.5" ry="6.8" transform="rotate(-18 438 150)"/>
+  <text class="big" x="419" y="222">3ª</text>
+  <text class="lbl" x="419" y="242">línea → línea</text>
+  <text class="lbl" x="419" y="259">(o espacio → espacio)</text>
+  <text class="lbl" x="419" y="278">= saltas una tecla</text>
+
+  <!-- pair 3: 5th — line to 3rd line up (170 -> 130) -->
+  <ellipse class="nh"  cx="560" cy="170" rx="9.5" ry="6.8" transform="rotate(-18 560 170)"/>
+  <ellipse class="acc" cx="598" cy="130" rx="9.5" ry="6.8" transform="rotate(-18 598 130)"/>
+  <text class="big" x="579" y="222">5ª</text>
+  <text class="lbl" x="579" y="242">línea → salta una</text>
+  <text class="lbl" x="579" y="259">línea → línea</text>
+  <text class="lbl" x="579" y="278">= tu mano abierta</text>
+
+  <!-- pair 4: octave (170 -> 100 is a 6th... use 170 -> 100? E4->D5 = 7th). Use 170->95 approximate octave E4->E5 = y 70 -->
+  <ellipse class="nh"  cx="720" cy="170" rx="9.5" ry="6.8" transform="rotate(-18 720 170)"/>
+  <ellipse class="acc" cx="758" cy="100" rx="9.5" ry="6.8" transform="rotate(-18 758 100)"/>
+  <text class="big" x="739" y="222">8ª</text>
+  <text class="lbl" x="739" y="242">misma letra,</text>
+  <text class="lbl" x="739" y="259">línea → espacio</text>
+  <text class="lbl" x="739" y="278">a 4 pasos</text>
+
+  <text class="note" x="30" y="308">Truco: cuando veas la 1ª nota de un compás, nómbrala. Las siguientes, léelas SOLO como distancia desde la anterior. Nombrar cada nota es lo que te frena.</text>
+</svg>
