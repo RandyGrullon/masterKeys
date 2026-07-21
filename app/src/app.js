@@ -1,26 +1,39 @@
 /**
  * Lectura a Primera Vista — orquestación de la app.
  *
- * Dos modos:
+ * Entradas:
+ *   táctil — tocas la tecla en el piano de pantalla (para el viaje, sin piano)
  *   piano  — el micrófono escucha la nota tocada (requiere el instrumento)
- *   táctil — se toca el nombre en pantalla (para el viaje a Alemania, 8-30 ago,
- *            donde no hay piano pero sí hay que mantener la velocidad de lectura)
  *
- * Decisión pedagógica: ante un error NO se revela la respuesta. Dar la nota en
- * cuanto el alumno vacila elimina el intento de recuperación, que es donde
- * ocurre el aprendizaje. Solo se marca el fallo y se deja reintentar.
+ * Ayuda (modo aprender): el piano ILUMINA la tecla de la nota actual. Es para
+ * quien todavía no ubica las teclas. Pero mostrar la respuesta convierte el
+ * ejercicio en emparejar posiciones, no en leer — así que las sesiones con
+ * ayuda se marcan `assisted` y NO cuentan para la puerta. La medición honesta
+ * solo ocurre con la ayuda apagada.
+ *
+ * Ante un error NO se revela la nota correcta: dar la respuesta en cuanto el
+ * alumno vacila elimina el intento de recuperación, que es donde se aprende.
  */
 
 import { generateExercise, LEVELS } from './music/generator.js';
 import { renderExercise } from './music/staff.js';
-import { describeMidi, matchesExpected } from './music/theory.js';
+import { renderKeyboard } from './music/keyboard.js';
+import {
+  describeMidi, matchesExpected,
+  describeStaffPosition, describeInterval, nearestAnchor,
+} from './music/theory.js';
 import { PianoListener } from './audio/listener.js';
 import { saveSession, summarize, evaluateGate, loadSessions, markSeedUsed, GATE } from './store.js';
 
 const $ = (sel) => document.querySelector(sel);
 
+// Rango del piano en pantalla: cubre todos los niveles con margen (DO2–DO6).
+const KB_LO = 36;
+const KB_HI = 84;
+
 const state = {
   mode: 'tap',
+  showKey: true,
   level: 1,
   exercise: null,
   states: [],
@@ -30,6 +43,7 @@ const state = {
   noteShownAt: null,
   listener: null,
   running: false,
+  keyboard: null,
 };
 
 // ── Ejercicio ─────────────────────────────────────────────────────────
@@ -45,12 +59,65 @@ function newExercise() {
 
 function draw() {
   renderExercise($('#score'), state.exercise, state.states);
-  const el = $('#score');
-  // Mantiene la nota actual a la vista: la partitura se desplaza de lado.
+  const scoreEl = $('#score');
   const x = 96 + state.index * 62;
-  el.scrollTo({ left: Math.max(0, x - el.clientWidth / 2), behavior: 'smooth' });
-  $('#exercise-info').textContent =
-    `${state.exercise.levelName} · ${state.exercise.keyName} · ${state.index + 1}/${state.exercise.notes.length}`;
+  scoreEl.scrollTo({ left: Math.max(0, x - scoreEl.clientWidth / 2), behavior: 'smooth' });
+  updateGuidance();
+}
+
+/** Actualiza el piano resaltado y el panel de lógica de lectura. */
+function updateGuidance() {
+  const note = state.exercise?.notes[state.index];
+  const kb = state.keyboard;
+  if (kb) {
+    kb.clear();
+    if (note && state.showKey) kb.mark(note.midi, 'target');
+    if (note) {
+      const x = kb.xOf(note.midi);
+      if (x != null) {
+        const el = $('#piano');
+        el.scrollTo({ left: Math.max(0, x - el.clientWidth / 2), behavior: 'smooth' });
+      }
+    }
+  }
+  renderLiteracy(note);
+}
+
+/** Panel "lógica de lectura": explica la nota actual en palabras. */
+function renderLiteracy(note) {
+  const box = $('#literacy');
+  if (!note) { box.hidden = true; return; }
+  box.hidden = false;
+
+  const info = describeMidi(note.midi);
+  $('#lit-name').textContent = info.nameEs;
+
+  const anc = nearestAnchor(note.midi);
+  $('#lit-anchor').textContent = anc.isAnchor
+    ? '★ es una de tus 4 anclas'
+    : `a ${anc.distance} ${anc.distance === 1 ? 'grado' : 'grados'} de ${describeMidi(anc.anchor.midi).nameEs} (ancla)`;
+
+  $('#lit-staff').textContent = describeStaffPosition(note.midi, note.clef);
+
+  const groupHint = info.nameEs.startsWith('DO')
+    ? 'a la izquierda del grupo de 2 negras'
+    : info.nameEs.startsWith('FA')
+      ? 'a la izquierda del grupo de 3 negras'
+      : 'tecla blanca';
+  $('#lit-key').textContent = state.showKey
+    ? `iluminada en el piano — ${groupHint}`
+    : `búscala en el piano: ${groupHint}`;
+
+  // Intervalo desde la nota anterior — la Lección 3 del plan.
+  if (state.index > 0) {
+    const prev = state.exercise.notes[state.index - 1];
+    const iv = describeInterval(prev.midi, note.midi);
+    $('#lit-interval').textContent = iv.steps === 0
+      ? 'la misma nota que la anterior'
+      : `${iv.number} ${iv.dir} desde ${describeMidi(prev.midi).nameEs} — ${iv.shape}`;
+  } else {
+    $('#lit-interval').textContent = 'primera nota: nómbrala; las siguientes, léelas por distancia';
+  }
 }
 
 function expectedNote() {
@@ -64,27 +131,27 @@ function submit(midi) {
   const latencyMs = performance.now() - state.noteShownAt;
 
   state.events.push({
-    expected: expected.midi,
-    played: midi,
-    correct,
-    latencyMs,
-    clef: expected.clef,
-    at: Date.now(),
+    expected: expected.midi, played: midi, correct, latencyMs,
+    clef: expected.clef, at: Date.now(),
   });
+
+  if (state.keyboard) {
+    state.keyboard.clearFeedback();
+    state.keyboard.mark(midi, correct ? 'correct' : 'wrong');
+    setTimeout(() => state.keyboard && state.keyboard.clearFeedback(), 450);
+  }
 
   if (correct) {
     state.states[state.index] = 'ok';
     state.index++;
-    if (state.index >= state.exercise.notes.length) {
-      newExercise();
-    } else {
+    if (state.index >= state.exercise.notes.length) newExercise();
+    else {
       state.states[state.index] = 'current';
       state.noteShownAt = performance.now();
       draw();
     }
     flash('ok');
   } else {
-    // Se marca el error pero NO se revela la nota correcta ni se avanza.
     state.states[state.index] = 'error';
     draw();
     setTimeout(() => {
@@ -103,10 +170,7 @@ function flash(kind, text = '') {
   el.className = `feedback ${kind}`;
   el.textContent = kind === 'ok' ? '✓' : `✕ ${text}`;
   clearTimeout(flash._t);
-  flash._t = setTimeout(() => {
-    el.className = 'feedback';
-    el.textContent = '';
-  }, 600);
+  flash._t = setTimeout(() => { el.className = 'feedback'; el.textContent = ''; }, 600);
 }
 
 // ── Estadísticas ──────────────────────────────────────────────────────
@@ -121,7 +185,8 @@ function updateStats() {
 }
 
 function renderGate() {
-  const g = evaluateGate();
+  // Solo las sesiones SIN ayuda cuentan: con la tecla a la vista no se prueba lectura.
+  const g = evaluateGate(loadSessions().filter((s) => !s.assisted));
   const box = $('#gate');
   if (g.status === null) {
     box.className = 'gate unknown';
@@ -129,12 +194,14 @@ function renderGate() {
   } else {
     box.className = `gate ${g.status ? 'passed' : 'pending'}`;
     box.innerHTML =
-      `<strong>Puerta de Fase 1 ${g.status ? '— superada' : ''}</strong>` +
-      `<span>${g.reason} · muestra de ${g.sample} notas</span>`;
+      `<strong>Puerta de Fase 1 ${g.status ? '— superada 🎉' : ''}</strong>` +
+      `<span>${g.reason} · muestra de ${g.sample} notas sin ayuda</span>`;
   }
   const sessions = loadSessions();
+  const assisted = sessions.filter((s) => s.assisted).length;
   $('#history').textContent = sessions.length
-    ? `${sessions.length} sesiones guardadas · ${sessions.reduce((n, s) => n + s.events.length, 0)} notas en total`
+    ? `${sessions.length} sesiones · ${sessions.reduce((n, s) => n + s.events.length, 0)} notas` +
+      (assisted ? ` · ${assisted} en modo aprender (no cuentan para la meta)` : '')
     : 'Sin sesiones todavía';
 }
 
@@ -148,9 +215,7 @@ async function startSession() {
     try {
       state.listener = new PianoListener({
         onNote: ({ midi }) => submit(midi),
-        onLevel: (rms) => {
-          $('#level-bar').style.width = `${Math.min(100, rms * 900)}%`;
-        },
+        onLevel: (rms) => { $('#level-bar').style.width = `${Math.min(100, rms * 900)}%`; },
       });
       await state.listener.start();
       $('#mic-status').textContent = 'Escuchando el piano';
@@ -158,7 +223,7 @@ async function startSession() {
       $('#mic-status').textContent = `Sin micrófono: ${err.message}`;
       state.mode = 'tap';
       $('#mode-tap').checked = true;
-      renderTapPad();
+      setMode('tap');
     }
   }
 
@@ -170,15 +235,13 @@ async function startSession() {
 
 function stopSession() {
   state.running = false;
-  if (state.listener) {
-    state.listener.stop();
-    state.listener = null;
-  }
+  if (state.listener) { state.listener.stop(); state.listener = null; }
   const durationMs = performance.now() - state.startedAt;
   if (state.events.length) {
     saveSession({
       date: new Date().toISOString(),
       mode: state.mode,
+      assisted: state.showKey, // con ayuda no cuenta para la puerta
       level: state.level,
       durationMs,
       events: state.events,
@@ -188,36 +251,22 @@ function stopSession() {
   $('#btn-stop').hidden = true;
   $('#mic-status').textContent = '';
   $('#level-bar').style.width = '0%';
+  if (state.keyboard) state.keyboard.clear();
   renderGate();
 }
 
-// ── Teclado táctil (modo sin piano) ───────────────────────────────────
-function renderTapPad() {
-  const pad = $('#tap-pad');
-  pad.innerHTML = '';
-  const names = ['DO', 'RE', 'MI', 'FA', 'SOL', 'LA', 'SI'];
-  // Se pide la nota Y la octava: confundir DO4 con DO5 es justo el error que
-  // el plan quiere corregir, así que no se puede aceptar la clase de altura sola.
-  for (let octave = 2; octave <= 6; octave++) {
-    const row = document.createElement('div');
-    row.className = 'tap-row';
-    names.forEach((n, degree) => {
-      const midi = (octave + 1) * 12 + [0, 2, 4, 5, 7, 9, 11][degree];
-      const b = document.createElement('button');
-      b.className = 'tap-key';
-      b.textContent = `${n}${octave}`;
-      b.addEventListener('click', () => submit(midi));
-      row.appendChild(b);
-    });
-    pad.appendChild(row);
-  }
-}
-
+// ── Modo de entrada ───────────────────────────────────────────────────
 function setMode(mode) {
   state.mode = mode;
-  $('#tap-pad').hidden = mode !== 'tap';
   $('#mic-panel').hidden = mode !== 'piano';
-  if (mode === 'tap') renderTapPad();
+  // En modo micrófono el piano es solo guía; en táctil, es la entrada.
+  buildKeyboard();
+}
+
+function buildKeyboard() {
+  const onKey = state.mode === 'tap' ? (midi) => submit(midi) : null;
+  state.keyboard = renderKeyboard($('#piano'), KB_LO, KB_HI, onKey);
+  updateGuidance();
 }
 
 // ── Arranque ──────────────────────────────────────────────────────────
@@ -236,16 +285,19 @@ function init() {
 
   $('#mode-tap').addEventListener('change', () => setMode('tap'));
   $('#mode-piano').addEventListener('change', () => setMode('piano'));
+  $('#show-key').addEventListener('change', (e) => {
+    state.showKey = e.target.checked;
+    updateGuidance();
+  });
   $('#btn-start').addEventListener('click', startSession);
   $('#btn-stop').addEventListener('click', stopSession);
 
-  // Enganche de depuración: permite simular una sesión sin micrófono ni
-  // clics, para verificar el ciclo completo de medición.
+  // Enganche de depuración: simular sesiones sin micrófono ni clics.
   window.__piano = { state, submit };
 
-  setMode('tap');
   state.exercise = generateExercise(1, 12345);
   state.states = state.exercise.notes.map((_, i) => (i === 0 ? 'current' : 'pending'));
+  buildKeyboard();
   draw();
   renderGate();
 

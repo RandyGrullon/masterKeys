@@ -72,3 +72,73 @@ export function matchesExpected(detectedMidi, expectedMidi, tolerantOctave = fal
   if (detectedMidi === expectedMidi) return true;
   return tolerantOctave && Math.abs(detectedMidi - expectedMidi) % 12 === 0;
 }
+
+// ── Lógica de lectura (la "literatura" del pentagrama) ─────────────────
+
+const ORD_F = ['', '1ª', '2ª', '3ª', '4ª', '5ª'];
+const ORD_M = ['', '1er', '2º', '3er', '4º', '5º'];
+
+/**
+ * Describe dónde está una nota en el pentagrama: línea o espacio, y qué número,
+ * contando líneas adicionales. Es lo que un principiante necesita oír en
+ * palabras: "2ª línea", "1ª línea adicional debajo".
+ */
+export function describeStaffPosition(midi, clef) {
+  const bottom = clef === 'treble' ? TREBLE_BOTTOM_INDEX : BASS_BOTTOM_INDEX;
+  const rel = diatonicIndex(midi) - bottom; // 0 = línea inferior
+  const clefName = clef === 'treble' ? 'de sol' : 'de fa';
+
+  if (rel >= 0 && rel <= 8) {
+    if (rel % 2 === 0) return `${ORD_F[rel / 2 + 1]} línea del pentagrama ${clefName}`;
+    return `${ORD_M[(rel - 1) / 2 + 1]} espacio del pentagrama ${clefName}`;
+  }
+  // Fuera del pentagrama: líneas adicionales.
+  if (rel < 0) {
+    const n = Math.ceil(-rel / 2);
+    return rel % 2 === 0
+      ? `${ORD_F[n]} línea adicional debajo`
+      : `en el espacio bajo la ${ORD_F[Math.floor((-rel) / 2)] || '1ª'} línea adicional`;
+  }
+  const over = rel - 8;
+  const n = Math.ceil(over / 2);
+  return over % 2 === 0
+    ? `${ORD_F[n]} línea adicional encima`
+    : `en el espacio sobre la ${ORD_F[Math.max(1, Math.floor(over / 2))]} línea adicional`;
+}
+
+/**
+ * Describe el intervalo entre dos notas — el corazón de la Lección 3 del plan:
+ * leer por DISTANCIA, no por nombre. Devuelve el número (2ª, 3ª…), la dirección
+ * y la "forma" visual que se ve en el pentagrama.
+ */
+export function describeInterval(fromMidi, toMidi) {
+  const diff = diatonicIndex(toMidi) - diatonicIndex(fromMidi);
+  const steps = Math.abs(diff);
+  const dir = diff > 0 ? 'hacia arriba' : diff < 0 ? 'hacia abajo' : '';
+  const NAMES = ['unísono', '2ª', '3ª', '4ª', '5ª', '6ª', '7ª', '8ª (octava)'];
+  const number = NAMES[steps] ?? `${steps + 1}ª`;
+  const SHAPES = {
+    0: 'la misma nota',
+    1: 'tecla de al lado — línea a espacio vecino',
+    2: 'saltas una tecla — línea a línea, o espacio a espacio',
+    3: 'saltas dos teclas',
+    4: 'la apertura natural de la mano',
+    7: 'misma letra, una octava',
+  };
+  return { steps, number, dir, shape: SHAPES[steps] ?? `salto de ${steps} grados`, isStep: steps === 1 };
+}
+
+/** El ancla más cercana y a qué distancia diatónica está. */
+export function nearestAnchor(midi) {
+  const target = diatonicIndex(midi);
+  let best = ANCHORS[0];
+  let bestDist = Infinity;
+  for (const a of ANCHORS) {
+    const d = Math.abs(diatonicIndex(a.midi) - target);
+    if (d < bestDist) {
+      bestDist = d;
+      best = a;
+    }
+  }
+  return { anchor: best, distance: bestDist, isAnchor: bestDist === 0 };
+}

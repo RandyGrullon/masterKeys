@@ -5,7 +5,7 @@
  */
 // Subir esta version en CADA cambio de los archivos cacheados: la estrategia
 // es cache-first y si no, el navegador sigue sirviendo la version vieja.
-const CACHE = 'piano-trainer-v2';
+const CACHE = 'piano-trainer-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -18,6 +18,7 @@ const ASSETS = [
   './src/music/theory.js',
   './src/music/staff.js',
   './src/music/generator.js',
+  './src/music/keyboard.js',
   './icons/icon.svg',
 ];
 

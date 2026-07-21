@@ -3,60 +3,96 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#12141a" />
+  <meta name="theme-color" content="#0e1016" />
   <title>Lectura a Primera Vista</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Lectura a primera vista</h1>
-    <p class="sub">Cada ejercicio es nuevo. No se puede memorizar — por eso la medición vale.</p>
-  </header>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <span class="logo">🎹</span>
+        <div>
+          <h1>Lectura a primera vista</h1>
+          <p class="sub">Cada ejercicio es nuevo. No se puede memorizar — por eso la medición vale.</p>
+        </div>
+      </div>
+    </header>
 
-  <section class="controls">
-    <label class="field">
-      <span>Nivel</span>
-      <select id="level"></select>
-    </label>
+    <!-- Partitura -->
+    <section class="card score-card">
+      <div id="score" class="score-scroll"></div>
+      <div id="feedback" class="feedback"></div>
+    </section>
 
-    <div class="modes">
-      <label><input type="radio" name="mode" id="mode-tap" checked /> Sin piano <em>(pantalla)</em></label>
-      <label><input type="radio" name="mode" id="mode-piano" /> Con piano <em>(micrófono)</em></label>
-    </div>
+    <!-- Panel de lógica de lectura -->
+    <section id="literacy" class="literacy" hidden>
+      <div class="lit-note">
+        <span id="lit-name" class="lit-name">—</span>
+        <span id="lit-anchor" class="lit-anchor"></span>
+      </div>
+      <ul class="lit-lines">
+        <li><span class="lit-ico">👁</span><span id="lit-staff">—</span></li>
+        <li><span class="lit-ico">🎹</span><span id="lit-key">—</span></li>
+        <li><span class="lit-ico">📏</span><span id="lit-interval">—</span></li>
+      </ul>
+    </section>
 
-    <div class="actions">
-      <button id="btn-start" class="primary">Empezar sesión</button>
-      <button id="btn-stop" class="danger" hidden>Terminar y guardar</button>
-    </div>
-  </section>
+    <!-- Piano -->
+    <section class="card piano-card">
+      <div id="piano" class="piano-scroll"></div>
+      <p class="piano-caption">DO está siempre a la izquierda de las 2 teclas negras. FA, a la izquierda de las 3.</p>
+    </section>
 
-  <div id="mic-panel" hidden>
-    <div class="level-meter"><div id="level-bar"></div></div>
-    <p id="mic-status" class="mic-status"></p>
+    <!-- Controles -->
+    <section class="card controls">
+      <div class="row">
+        <label class="field">
+          <span>Nivel</span>
+          <select id="level"></select>
+        </label>
+      </div>
+
+      <div class="row toggles">
+        <div class="seg" role="group" aria-label="Entrada">
+          <input type="radio" name="mode" id="mode-tap" checked />
+          <label for="mode-tap">Toco en pantalla</label>
+          <input type="radio" name="mode" id="mode-piano" />
+          <label for="mode-piano">Toco mi piano 🎤</label>
+        </div>
+
+        <label class="help-toggle">
+          <input type="checkbox" id="show-key" checked />
+          <span>Mostrarme la tecla <em>(modo aprender)</em></span>
+        </label>
+      </div>
+
+      <div class="row actions">
+        <button id="btn-start" class="primary">Empezar sesión</button>
+        <button id="btn-stop" class="danger" hidden>Terminar y guardar</button>
+        <div id="mic-panel" class="mic-panel" hidden>
+          <div class="level-meter"><div id="level-bar"></div></div>
+          <span id="mic-status" class="mic-status"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Estadísticas -->
+    <section class="stats">
+      <div class="stat"><span class="label">Correctas</span><span class="value" id="stat-correct">0</span></div>
+      <div class="stat"><span class="label">Precisión</span><span class="value" id="stat-accuracy">—</span></div>
+      <div class="stat"><span class="label">Notas/min</span><span class="value" id="stat-npm">—</span></div>
+      <div class="stat"><span class="label">Latencia p90</span><span class="value" id="stat-p90">—</span></div>
+    </section>
+
+    <div id="gate" class="gate unknown"></div>
+    <p id="history" class="history"></p>
+
+    <footer>
+      <p><strong>Meta de Fase 1:</strong> identificar cualquier nota de ambas claves en menos de 2 s, con 95% de acierto. El modo aprender no cuenta para la meta — ahí el piano te da la respuesta.</p>
+    </footer>
   </div>
-
-  <section class="score-wrap">
-    <div id="score" class="score-scroll"></div>
-    <div id="feedback" class="feedback"></div>
-    <p id="exercise-info" class="exercise-info"></p>
-  </section>
-
-  <div id="tap-pad" class="tap-pad"></div>
-
-  <section class="stats">
-    <div class="stat"><span class="label">Correctas</span><span class="value" id="stat-correct">0</span></div>
-    <div class="stat"><span class="label">Precisión</span><span class="value" id="stat-accuracy">—</span></div>
-    <div class="stat"><span class="label">Notas/min</span><span class="value" id="stat-npm">—</span></div>
-    <div class="stat"><span class="label">Latencia p90</span><span class="value" id="stat-p90">—</span></div>
-  </section>
-
-  <div id="gate" class="gate unknown"></div>
-  <p id="history" class="history"></p>
-
-  <footer>
-    <p>Meta de Fase 1: identificar cualquier nota de ambas claves en menos de 2 s, con 95% de acierto.</p>
-  </footer>
 
   <script type="module" src="./src/app.js"></script>
 </body>

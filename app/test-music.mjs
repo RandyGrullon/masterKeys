@@ -7,7 +7,10 @@
  *   node test-music.mjs
  */
 
-import { diatonicIndex, describeMidi, midiToFrequency, frequencyToNote, matchesExpected } from './src/music/theory.js';
+import {
+  diatonicIndex, describeMidi, midiToFrequency, frequencyToNote, matchesExpected,
+  describeStaffPosition, describeInterval, nearestAnchor,
+} from './src/music/theory.js';
 import { yFor, LAYOUT } from './src/music/staff.js';
 import { generateExercise, LEVELS, KEYS } from './src/music/generator.js';
 
@@ -58,6 +61,32 @@ ok('DO4 != SI3 en clave de fa (bug historico)', do4bass !== si3, `ambos dieron $
 // DO4 en clave de sol: 1a linea adicional DEBAJO
 const mi4 = yFor(64, 'treble');
 eq('DO4 en clave de sol, una linea adicional debajo', yFor(60, 'treble'), mi4 + G);
+
+console.log('\n=== Logica de lectura ===');
+// Posicion en el pentagrama
+eq('SOL4 -> 2a linea de sol', describeStaffPosition(67, 'treble'), '2ª línea del pentagrama de sol');
+eq('MI4 -> 1a linea de sol', describeStaffPosition(64, 'treble'), '1ª línea del pentagrama de sol');
+eq('FA4 -> 1er espacio de sol', describeStaffPosition(65, 'treble'), '1er espacio del pentagrama de sol');
+eq('DO4 en sol -> 1a linea adicional debajo', describeStaffPosition(60, 'treble'), '1ª línea adicional debajo');
+eq('FA3 -> 4a linea de fa', describeStaffPosition(53, 'bass'), '4ª línea del pentagrama de fa');
+eq('DO4 en fa -> 1a linea adicional encima', describeStaffPosition(60, 'bass'), '1ª línea adicional encima');
+// Intervalos
+{
+  const t = describeInterval(60, 62); // DO4 -> RE4
+  eq('DO->RE es 2a', t.number, '2ª');
+  eq('DO->RE hacia arriba', t.dir, 'hacia arriba');
+  ok('DO->RE es grado conjunto', t.isStep === true);
+}
+{
+  const t = describeInterval(67, 60); // SOL4 -> DO4
+  eq('SOL->DO (baja) es 5a', t.number, '5ª');
+  eq('SOL->DO hacia abajo', t.dir, 'hacia abajo');
+}
+eq('DO4->DO5 es octava', describeInterval(60, 72).number, '8ª (octava)');
+eq('DO->MI es 3a', describeInterval(60, 64).number, '3ª');
+// Anclas
+ok('DO4 ES ancla', nearestAnchor(60).isAnchor === true);
+ok('RE4 no es ancla, esta a 1 grado de DO4', nearestAnchor(62).isAnchor === false && nearestAnchor(62).distance === 1);
 
 console.log('\n=== Frecuencias ===');
 ok('LA4 = 440 Hz', Math.abs(midiToFrequency(69) - 440) < 0.001);
