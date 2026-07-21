@@ -20,71 +20,76 @@
       </div>
     </header>
 
-    <!-- Partitura -->
-    <section class="card score-card">
-      <div id="score" class="score-scroll"></div>
-      <div id="feedback" class="feedback"></div>
-    </section>
+    <div class="layout">
+      <!-- ── Sidebar izquierdo: controles ── -->
+      <aside class="sidebar card controls">
+        <h2 class="side-title">Sesión</h2>
 
-    <!-- Panel de lógica de lectura -->
-    <section id="literacy" class="literacy" hidden>
-      <div class="lit-note">
-        <span id="lit-name" class="lit-name">—</span>
-        <span id="lit-anchor" class="lit-anchor"></span>
-      </div>
-      <ul class="lit-lines">
-        <li><span class="lit-ico">👁</span><span id="lit-staff">—</span></li>
-        <li><span class="lit-ico">🎹</span><span id="lit-key">—</span></li>
-        <li><span class="lit-ico">📏</span><span id="lit-interval">—</span></li>
-      </ul>
-    </section>
-
-    <!-- Piano -->
-    <section class="card piano-card">
-      <div id="piano" class="piano-scroll"></div>
-      <p class="piano-caption">DO está siempre a la izquierda de las 2 teclas negras. FA, a la izquierda de las 3.</p>
-    </section>
-
-    <!-- Controles -->
-    <section class="card controls">
-      <div class="row">
         <label class="field">
           <span>Nivel</span>
           <select id="level"></select>
         </label>
-      </div>
 
-      <div class="row toggles">
-        <div class="seg" role="group" aria-label="Entrada">
-          <input type="radio" name="mode" id="mode-tap" checked />
-          <label for="mode-tap">Toco en pantalla</label>
-          <input type="radio" name="mode" id="mode-piano" />
-          <label for="mode-piano">Toco mi piano 🎤</label>
+        <div class="field">
+          <span>Entrada</span>
+          <div class="seg" role="group" aria-label="Entrada">
+            <input type="radio" name="mode" id="mode-tap" checked />
+            <label for="mode-tap">En pantalla</label>
+            <input type="radio" name="mode" id="mode-piano" />
+            <label for="mode-piano">Mi piano 🎤</label>
+          </div>
         </div>
 
         <label class="help-toggle">
           <input type="checkbox" id="show-key" checked />
           <span>Mostrarme la tecla <em>(modo aprender)</em></span>
         </label>
-      </div>
 
-      <div class="row actions">
-        <button id="btn-start" class="primary">Empezar sesión</button>
-        <button id="btn-stop" class="danger" hidden>Terminar y guardar</button>
+        <div class="actions">
+          <button id="btn-start" class="primary">Empezar sesión</button>
+          <button id="btn-stop" class="danger" hidden>Terminar y guardar</button>
+        </div>
+
         <div id="mic-panel" class="mic-panel" hidden>
           <div class="level-meter"><div id="level-bar"></div></div>
           <span id="mic-status" class="mic-status"></span>
         </div>
-      </div>
-    </section>
+      </aside>
 
-    <!-- Estadísticas -->
-    <section class="stats">
-      <div class="stat"><span class="label">Correctas</span><span class="value" id="stat-correct">0</span></div>
-      <div class="stat"><span class="label">Precisión</span><span class="value" id="stat-accuracy">—</span></div>
-      <div class="stat"><span class="label">Notas/min</span><span class="value" id="stat-npm">—</span></div>
-      <div class="stat"><span class="label">Latencia p90</span><span class="value" id="stat-p90">—</span></div>
-    </section>
+      <!-- ── Centro: partitura + lógica + piano ── -->
+      <main class="center">
+        <section class="card score-card">
+          <div id="score" class="score-scroll"></div>
+          <div id="feedback" class="feedback"></div>
+        </section>
+
+        <section id="literacy" class="literacy" hidden>
+          <div class="lit-note">
+            <span id="lit-name" class="lit-name">—</span>
+            <span id="lit-anchor" class="lit-anchor"></span>
+          </div>
+          <ul class="lit-lines">
+            <li><span class="lit-ico">👁</span><span id="lit-staff">—</span></li>
+            <li><span class="lit-ico">🎹</span><span id="lit-key">—</span></li>
+            <li><span class="lit-ico">📏</span><span id="lit-interval">—</span></li>
+          </ul>
+        </section>
+
+        <section class="card piano-card">
+          <div id="piano" class="piano-scroll"></div>
+          <p class="piano-caption">DO está siempre a la izquierda de las 2 teclas negras. FA, a la izquierda de las 3.</p>
+        </section>
+      </main>
+
+      <!-- ── Sidebar derecho: estadísticas ── -->
+      <aside class="sidebar card stats-side">
+        <h2 class="side-title">Tu sesión</h2>
+        <div class="stat"><span class="label">Correctas</span><span class="value" id="stat-correct">0</span></div>
+        <div class="stat"><span class="label">Precisión</span><span class="value" id="stat-accuracy">—</span></div>
+        <div class="stat"><span class="label">Notas/min</span><span class="value" id="stat-npm">—</span></div>
+        <div class="stat"><span class="label">Latencia p90</span><span class="value" id="stat-p90">—</span></div>
+      </aside>
+    </div>
 
     <div id="gate" class="gate unknown"></div>
     <p id="history" class="history"></p>
