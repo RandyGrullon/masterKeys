@@ -54,6 +54,27 @@
           <div class="level-meter"><div id="level-bar"></div></div>
           <span id="mic-status" class="mic-status"></span>
         </div>
+
+        <!-- Sincronización en la nube (opcional) -->
+        <div class="sync">
+          <h3 class="sync-title">☁ Sincronizar progreso</h3>
+          <div id="sync-out">
+            <input id="sync-email" class="sync-input" type="email" placeholder="tu correo" autocomplete="email" />
+            <input id="sync-pass" class="sync-input" type="password" placeholder="contraseña" autocomplete="current-password" />
+            <div class="sync-btns">
+              <button id="sync-signin" class="ghost">Entrar</button>
+              <button id="sync-signup" class="ghost">Crear cuenta</button>
+            </div>
+          </div>
+          <div id="sync-in" hidden>
+            <p class="sync-user">Conectado: <span id="sync-email-label"></span></p>
+            <div class="sync-btns">
+              <button id="sync-now" class="ghost">Sincronizar ahora</button>
+              <button id="sync-out-btn" class="ghost">Salir</button>
+            </div>
+          </div>
+          <p id="sync-status" class="sync-status"></p>
+        </div>
       </aside>
 
       <!-- ── Centro: partitura + lógica + piano ── -->

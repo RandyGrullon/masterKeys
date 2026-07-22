@@ -17,20 +17,71 @@ export const GATE = {
   targetNotesPerMin: 60,
 };
 
+/** Id estable por sesión — la clave para deduplicar al sincronizar. */
+function newId() {
+  return (globalThis.crypto?.randomUUID?.() ??
+    'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+}
+
 export function loadSessions() {
+  let list;
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '[]');
+    list = JSON.parse(localStorage.getItem(KEY) ?? '[]');
   } catch {
     return [];
   }
+  // Migración: sesiones viejas sin id reciben uno (no las marca sincronizadas).
+  let changed = false;
+  for (const s of list) {
+    if (!s.id) { s.id = newId(); changed = true; }
+    if (s.synced === undefined) { s.synced = false; changed = true; }
+  }
+  if (changed) localStorage.setItem(KEY, JSON.stringify(list));
+  return list;
 }
 
 export function saveSession(session) {
   const all = loadSessions();
-  all.push(session);
+  all.push({ id: newId(), synced: false, ...session });
   // Se conservan 400 sesiones (más de un año a 1/día).
   localStorage.setItem(KEY, JSON.stringify(all.slice(-400)));
   return session;
+}
+
+/** Sesiones aún no subidas a la nube. */
+export function unsyncedSessions() {
+  return loadSessions().filter((s) => !s.synced);
+}
+
+/** Marca como sincronizadas las sesiones con estos ids. */
+export function markSynced(ids) {
+  const set = new Set(ids);
+  const all = loadSessions();
+  for (const s of all) if (set.has(s.id)) s.synced = true;
+  localStorage.setItem(KEY, JSON.stringify(all));
+}
+
+/**
+ * Funde sesiones remotas en el store local. Las sesiones de práctica son
+ * inmutables (un registro de lo que ocurrió), así que la unión por id basta:
+ * sin conflictos, sin resolución. Devuelve cuántas se añadieron.
+ */
+export function mergeRemote(remoteSessions) {
+  const all = loadSessions();
+  const known = new Set(all.map((s) => s.id));
+  let added = 0;
+  for (const r of remoteSessions) {
+    if (r && r.id && !known.has(r.id)) {
+      all.push({ ...r, synced: true });
+      known.add(r.id);
+      added++;
+    }
+  }
+  if (added) {
+    all.sort((a, b) => new Date(a.date) - new Date(b.date));
+    localStorage.setItem(KEY, JSON.stringify(all.slice(-400)));
+  }
+  return added;
 }
 
 export function clearSessions() {

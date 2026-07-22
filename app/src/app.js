@@ -24,6 +24,8 @@ import {
 } from './music/theory.js';
 import { PianoListener } from './audio/listener.js';
 import { saveSession, summarize, evaluateGate, loadSessions, markSeedUsed, GATE } from './store.js';
+import { signIn, signUp, signOut, isSignedIn, userEmail } from './cloud/supabase.js';
+import { syncNow } from './cloud/sync.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -253,6 +255,71 @@ function stopSession() {
   $('#level-bar').style.width = '0%';
   if (state.keyboard) state.keyboard.clear();
   renderGate();
+  // Sube la sesión recién guardada si hay sesión en la nube (no bloquea la UI).
+  if (isSignedIn()) runSync();
+}
+
+// ── Sincronización en la nube ─────────────────────────────────────────
+function renderSyncUI() {
+  const inside = isSignedIn();
+  $('#sync-in').hidden = !inside;
+  $('#sync-out').hidden = inside;
+  if (inside) $('#sync-email-label').textContent = userEmail() ?? '';
+}
+
+async function runSync(quiet = true) {
+  const status = $('#sync-status');
+  if (!quiet) status.textContent = 'Sincronizando…';
+  const r = await syncNow();
+  if (r.ok) {
+    status.textContent = `✓ ${r.pushed} subidas · ${r.pulled} bajadas`;
+    if (r.pulled) renderGate();
+  } else if (r.reason === 'offline') {
+    status.textContent = 'Sin conexión — se sincroniza al volver';
+  } else if (r.reason === 'error') {
+    status.textContent = `Error: ${r.message}`;
+  } else if (!quiet) {
+    status.textContent = '';
+  }
+}
+
+function wireSync() {
+  const status = $('#sync-status');
+  const email = () => $('#sync-email').value.trim();
+  const pass = () => $('#sync-pass').value;
+
+  $('#sync-signin').addEventListener('click', async () => {
+    if (!email() || !pass()) { status.textContent = 'Correo y contraseña'; return; }
+    status.textContent = 'Entrando…';
+    try {
+      await signIn(email(), pass());
+      renderSyncUI();
+      await runSync(false);
+    } catch (e) { status.textContent = e.message; }
+  });
+
+  $('#sync-signup').addEventListener('click', async () => {
+    if (!email() || !pass()) { status.textContent = 'Correo y contraseña'; return; }
+    status.textContent = 'Creando cuenta…';
+    try {
+      await signUp(email(), pass());
+      if (isSignedIn()) { renderSyncUI(); await runSync(false); }
+      else status.textContent = 'Revisa tu correo para confirmar la cuenta';
+    } catch (e) { status.textContent = e.message; }
+  });
+
+  $('#sync-now').addEventListener('click', () => runSync(false));
+  $('#sync-out-btn').addEventListener('click', () => {
+    signOut();
+    renderSyncUI();
+    status.textContent = '';
+  });
+
+  renderSyncUI();
+  // Al abrir la app, si ya hay sesión, sincroniza en segundo plano.
+  if (isSignedIn()) runSync();
+  // Cuando vuelve la conexión, reintenta.
+  window.addEventListener('online', () => { if (isSignedIn()) runSync(); });
 }
 
 // ── Modo de entrada ───────────────────────────────────────────────────
@@ -291,6 +358,8 @@ function init() {
   });
   $('#btn-start').addEventListener('click', startSession);
   $('#btn-stop').addEventListener('click', stopSession);
+
+  wireSync();
 
   // Enganche de depuración: simular sesiones sin micrófono ni clics.
   window.__piano = { state, submit };
