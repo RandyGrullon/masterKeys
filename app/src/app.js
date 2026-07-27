@@ -23,6 +23,7 @@ import {
   describeStaffPosition, describeInterval, nearestAnchor,
 } from './music/theory.js';
 import { PianoListener } from './audio/listener.js';
+import { MidiListener } from './audio/midi.js';
 import { saveSession, summarize, evaluateGate, loadSessions, markSeedUsed, GATE } from './store.js';
 import { signIn, signUp, signOut, isSignedIn, userEmail } from './cloud/supabase.js';
 import { syncNow } from './cloud/sync.js';
@@ -227,6 +228,26 @@ async function startSession() {
       $('#mode-tap').checked = true;
       setMode('tap');
     }
+  } else if (state.mode === 'midi') {
+    try {
+      state.listener = new MidiListener({
+        onNote: ({ midi }) => submit(midi),
+        onDevice: (names) => {
+          $('#midi-status').textContent = names.length
+            ? `Conectado: ${names.join(', ')}`
+            : 'Ningún piano MIDI detectado — conéctalo por USB';
+        },
+      });
+      const devices = await state.listener.start();
+      $('#midi-status').textContent = devices.length
+        ? `Conectado: ${devices.join(', ')}`
+        : 'Ningún piano MIDI detectado — conéctalo por USB';
+    } catch (err) {
+      $('#midi-status').textContent = err.message;
+      state.mode = 'tap';
+      $('#mode-tap').checked = true;
+      setMode('tap');
+    }
   }
 
   newExercise();
@@ -326,7 +347,8 @@ function wireSync() {
 function setMode(mode) {
   state.mode = mode;
   $('#mic-panel').hidden = mode !== 'piano';
-  // En modo micrófono el piano es solo guía; en táctil, es la entrada.
+  $('#midi-panel').hidden = mode !== 'midi';
+  // Solo en táctil el piano es la entrada; en micrófono y MIDI es solo guía.
   buildKeyboard();
 }
 
@@ -351,6 +373,7 @@ function init() {
   });
 
   $('#mode-tap').addEventListener('change', () => setMode('tap'));
+  $('#mode-midi').addEventListener('change', () => setMode('midi'));
   $('#mode-piano').addEventListener('change', () => setMode('piano'));
   $('#show-key').addEventListener('change', (e) => {
     state.showKey = e.target.checked;

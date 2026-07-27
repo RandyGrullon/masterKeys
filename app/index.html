@@ -35,8 +35,10 @@
           <div class="seg" role="group" aria-label="Entrada">
             <input type="radio" name="mode" id="mode-tap" checked />
             <label for="mode-tap">En pantalla</label>
+            <input type="radio" name="mode" id="mode-midi" />
+            <label for="mode-midi">Piano MIDI 🎹</label>
             <input type="radio" name="mode" id="mode-piano" />
-            <label for="mode-piano">Mi piano 🎤</label>
+            <label for="mode-piano">Micrófono 🎤</label>
           </div>
         </div>
 
@@ -53,6 +55,10 @@
         <div id="mic-panel" class="mic-panel" hidden>
           <div class="level-meter"><div id="level-bar"></div></div>
           <span id="mic-status" class="mic-status"></span>
+        </div>
+
+        <div id="midi-panel" class="midi-panel" hidden>
+          <span id="midi-status" class="mic-status">Conecta tu piano MIDI y pulsa Empezar</span>
         </div>
 
         <!-- Sincronización en la nube (opcional) -->
