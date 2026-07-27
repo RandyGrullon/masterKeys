@@ -26,6 +26,7 @@ import { PianoListener } from './audio/listener.js';
 import { MidiListener } from './audio/midi.js';
 import { Synth } from './audio/synth.js';
 import { saveSession, summarize, evaluateGate, loadSessions, markSeedUsed, GATE } from './store.js';
+import { fullProgress, overallProgress, recommendedLevel } from './progress.js';
 import { signIn, signUp, signOut, isSignedIn, userEmail } from './cloud/supabase.js';
 import { syncNow } from './cloud/sync.js';
 
@@ -208,6 +209,54 @@ function renderGate() {
     ? `${sessions.length} sesiones · ${sessions.reduce((n, s) => n + s.events.length, 0)} notas` +
       (assisted ? ` · ${assisted} en modo aprender (no cuentan para la meta)` : '')
     : 'Sin sesiones todavía';
+
+  renderProgress(sessions);
+}
+
+/**
+ * Pinta los 5 niveles con su estado: dominado, en curso o bloqueado.
+ * Un nivel se bloquea hasta dominar el anterior — evita saltar a nivel 4
+ * sin haber consolidado las anclas, que es donde se instalan malos hábitos.
+ */
+function renderProgress(sessions) {
+  const prog = fullProgress(sessions);
+  const overall = overallProgress(sessions);
+  $('#progress-pct').textContent = `${overall.pct}%`;
+
+  const list = $('#progress-levels');
+  list.innerHTML = '';
+  const rec = recommendedLevel(sessions);
+
+  for (const p of prog) {
+    const li = document.createElement('li');
+    const isCurrent = p.id === rec && p.status !== 'mastered';
+    li.className = `plevel ${p.status}${isCurrent ? ' current' : ''}`;
+
+    const badge = p.status === 'mastered' ? '✓' : p.status === 'locked' ? '🔒' : p.id;
+    const acc = p.mastery.stats.attempted ? Math.round(p.mastery.stats.accuracy * 100) : 0;
+    const barPct = p.status === 'locked' ? 0 : Math.min(100, Math.round((p.mastery.stats.attempted / GATE.minNotes) * 100));
+
+    let detail;
+    if (p.status === 'locked') detail = 'domina el nivel anterior primero';
+    else if (p.status === 'mastered') detail = `dominado · ${acc}% de precisión`;
+    else if (p.mastery.stats.attempted === 0) detail = 'sin intentos todavía';
+    else detail = `${p.mastery.stats.attempted}/${GATE.minNotes} notas · ${p.mastery.reason}`;
+
+    li.innerHTML = `
+      <span class="plevel-badge">${badge}</span>
+      <span class="plevel-body">
+        <span class="plevel-name">${p.id}. ${p.name}</span>
+        <span class="plevel-detail">${detail}</span>
+      </span>
+      <span class="plevel-bar"><span class="plevel-bar-fill" style="width:${p.status === 'mastered' ? 100 : barPct}%"></span></span>
+    `;
+    list.appendChild(li);
+  }
+
+  const next = prog.find((p) => p.id === rec);
+  $('#progress-next').innerHTML = overall.mastered === overall.total
+    ? '🎉 Dominas los 5 niveles de la Fase 1 del plan.'
+    : `Siguiente objetivo: <strong>Nivel ${next.id} — ${next.name}</strong>`;
 }
 
 // ── Ciclo de sesión ───────────────────────────────────────────────────
@@ -263,6 +312,7 @@ function stopSession() {
   state.running = false;
   if (state.listener) { state.listener.stop(); state.listener = null; }
   const durationMs = performance.now() - state.startedAt;
+  const prevRecommended = recommendedLevel(loadSessions());
   if (state.events.length) {
     saveSession({
       date: new Date().toISOString(),
@@ -279,8 +329,28 @@ function stopSession() {
   $('#level-bar').style.width = '0%';
   if (state.keyboard) state.keyboard.clear();
   renderGate();
+
+  // Subida de nivel: si esta sesión (sin ayuda) hizo que se domine un nivel
+  // nuevo, se avanza el selector y se celebra con un pequeño arpegio.
+  const newRecommended = recommendedLevel(loadSessions());
+  if (newRecommended > prevRecommended) celebrateLevelUp(newRecommended);
+
   // Sube la sesión recién guardada si hay sesión en la nube (no bloquea la UI).
   if (isSignedIn()) runSync();
+}
+
+function celebrateLevelUp(newLevel) {
+  state.level = newLevel;
+  $('#level').value = String(newLevel);
+  if (state.synth.enabled) {
+    // Arpegio ascendente breve como confirmación sonora del logro.
+    [60, 64, 67, 72].forEach((m, i) => setTimeout(() => state.synth.play(m, 100), i * 90));
+  }
+  const el = $('#feedback');
+  el.className = 'feedback ok';
+  el.textContent = `🎉 Nivel ${newLevel}`;
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => { el.className = 'feedback'; el.textContent = ''; }, 2200);
 }
 
 // ── Sincronización en la nube ─────────────────────────────────────────
@@ -397,7 +467,12 @@ function init() {
   // Enganche de depuración: simular sesiones sin micrófono ni clics.
   window.__piano = { state, submit };
 
-  state.exercise = generateExercise(1, 12345);
+  // Arranca en el nivel recomendado según el progreso guardado, no siempre en 1:
+  // quien ya domina las anclas no debería tener que bajar el selector cada vez.
+  state.level = recommendedLevel(loadSessions());
+  sel.value = String(state.level);
+
+  state.exercise = generateExercise(state.level, Date.now());
   state.states = state.exercise.notes.map((_, i) => (i === 0 ? 'current' : 'pending'));
   buildKeyboard();
   draw();

@@ -214,6 +214,40 @@ button.ghost:hover { border-color: var(--accent); }
 .stat .value { font-size: 22px; font-weight: 800; }
 .stat .value.good { color: var(--ok); }
 
+/* ── Progreso ──────────────────────────────────────────────────────── */
+.progress-card { padding: 16px; }
+.progress-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.progress-head .side-title { margin: 0; }
+.progress-pct { font-size: 15px; font-weight: 800; color: var(--accent); }
+
+.progress-levels { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.plevel {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px; border-radius: 10px;
+  background: var(--bg-2); border: 1px solid var(--line);
+}
+.plevel.current { border-color: var(--accent); background: linear-gradient(180deg, rgba(224,168,68,.08), var(--bg-2)); }
+.plevel.locked { opacity: .5; }
+
+.plevel-badge {
+  flex: 0 0 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; background: var(--line); color: var(--muted);
+}
+.plevel.mastered .plevel-badge { background: var(--ok); color: #06210d; }
+.plevel.current .plevel-badge { background: var(--accent); color: #201500; }
+
+.plevel-body { flex: 1; min-width: 0; }
+.plevel-name { font-size: 13.5px; font-weight: 700; display: block; }
+.plevel-detail { font-size: 12px; color: var(--muted); display: block; margin-top: 1px; }
+
+.plevel-bar { flex: 0 0 70px; height: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.plevel-bar-fill { height: 100%; background: var(--accent); }
+.plevel.mastered .plevel-bar-fill { background: var(--ok); }
+
+.progress-next { font-size: 12.5px; color: var(--muted); margin: 12px 2px 0; }
+.progress-next strong { color: var(--accent); }
+
 .gate {
   border-radius: 11px; padding: 12px 14px;
   display: flex; flex-direction: column; gap: 3px; font-size: 13px;

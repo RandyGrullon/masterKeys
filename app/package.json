@@ -5,11 +5,12 @@
   "type": "module",
   "description": "PWA de lectura a primera vista: ejercicios generados y siempre nuevos, con escucha por microfono",
   "scripts": {
-    "test": "node test-yin.mjs && node test-music.mjs && node test-sync.mjs && node test-midi.mjs",
+    "test": "node test-yin.mjs && node test-music.mjs && node test-sync.mjs && node test-midi.mjs && node test-progress.mjs",
     "test:yin": "node test-yin.mjs",
     "test:music": "node test-music.mjs",
     "test:sync": "node test-sync.mjs",
     "test:midi": "node test-midi.mjs",
+    "test:progress": "node test-progress.mjs",
     "serve": "node serve.mjs"
   }
 }
