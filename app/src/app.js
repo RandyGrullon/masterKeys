@@ -38,7 +38,10 @@ const KB_HI = 84;
 
 const state = {
   mode: 'tap',
-  showKey: true,
+  // Por defecto APAGADA: con la tecla iluminada la sesión no cuenta para el
+  // progreso, y tener la ayuda encendida por defecto hacía que toda la
+  // práctica se descartara en silencio.
+  showKey: false,
   level: 1,
   exercise: null,
   states: [],
@@ -180,6 +183,32 @@ function flash(kind, text = '') {
 }
 
 // ── Estadísticas ──────────────────────────────────────────────────────
+
+/**
+ * Instantánea de la sesión en curso con el mismo formato que una guardada.
+ * Permite que el progreso se calcule en vivo, incluyendo lo que llevas ahora
+ * mismo, en vez de esperar a pulsar "Terminar".
+ */
+function liveSessionSnapshot() {
+  if (!state.running || !state.events.length) return null;
+  return {
+    id: '__live__',
+    date: new Date().toISOString(),
+    mode: state.mode,
+    assisted: state.showKey,
+    level: state.level,
+    durationMs: performance.now() - state.startedAt,
+    events: state.events,
+  };
+}
+
+/** Sesiones guardadas + la que está en curso, para métricas en vivo. */
+function sessionsWithLive() {
+  const live = liveSessionSnapshot();
+  const saved = loadSessions();
+  return live ? [...saved, live] : saved;
+}
+
 function updateStats() {
   const durationMs = state.startedAt ? performance.now() - state.startedAt : 0;
   const s = summarize({ events: state.events, durationMs });
@@ -188,6 +217,27 @@ function updateStats() {
   $('#stat-npm').textContent = s.notesPerMin ? s.notesPerMin.toFixed(0) : '—';
   $('#stat-p90').textContent = s.p90 ? `${(s.p90 / 1000).toFixed(2)} s` : '—';
   $('#stat-p90').className = s.p90 && s.p90 <= GATE.maxP90LatencyMs ? 'value good' : 'value';
+
+  updateLiveBadge(s);
+  // El progreso se recalcula en vivo: la barra debe moverse mientras tocas.
+  renderProgress(sessionsWithLive());
+}
+
+/** Indicador claro de si hay sesión activa y si esa sesión cuenta. */
+function updateLiveBadge(summary) {
+  const el = $('#live-badge');
+  if (!state.running) {
+    el.className = 'live-badge idle';
+    el.textContent = 'Sin sesión activa';
+    return;
+  }
+  if (state.showKey) {
+    el.className = 'live-badge warn';
+    el.textContent = `● En curso · ${summary.attempted} notas — NO cuenta (ayuda activa)`;
+  } else {
+    el.className = 'live-badge good';
+    el.textContent = `● En curso · ${summary.attempted} notas — cuenta para tu progreso`;
+  }
 }
 
 function renderGate() {
@@ -232,15 +282,30 @@ function renderProgress(sessions) {
     const isCurrent = p.id === rec && p.status !== 'mastered';
     li.className = `plevel ${p.status}${isCurrent ? ' current' : ''}`;
 
+    const st = p.mastery.stats;
     const badge = p.status === 'mastered' ? '✓' : p.status === 'locked' ? '🔒' : p.id;
-    const acc = p.mastery.stats.attempted ? Math.round(p.mastery.stats.accuracy * 100) : 0;
-    const barPct = p.status === 'locked' ? 0 : Math.min(100, Math.round((p.mastery.stats.attempted / GATE.minNotes) * 100));
+    const acc = st.attempted ? Math.round(st.accuracy * 100) : 0;
+
+    // La barra muestra el ESLABÓN MÁS DÉBIL de los tres criterios, no solo
+    // cuántas notas llevas: si tienes 50 notas pero 70% de precisión, estar
+    // al 100% de muestra no significa estar cerca de dominarlo.
+    let barPct = 0;
+    if (p.status === 'mastered') barPct = 100;
+    else if (p.status !== 'locked' && st.attempted) {
+      const sample = Math.min(1, st.attempted / GATE.minNotes);
+      const accuracy = Math.min(1, st.accuracy / GATE.minAccuracy);
+      const speed = st.p90 ? Math.min(1, GATE.maxP90LatencyMs / st.p90) : 0;
+      barPct = Math.round(Math.min(sample, accuracy, speed) * 100);
+    }
 
     let detail;
     if (p.status === 'locked') detail = 'domina el nivel anterior primero';
     else if (p.status === 'mastered') detail = `dominado · ${acc}% de precisión`;
-    else if (p.mastery.stats.attempted === 0) detail = 'sin intentos todavía';
-    else detail = `${p.mastery.stats.attempted}/${GATE.minNotes} notas · ${p.mastery.reason}`;
+    else if (st.attempted === 0) detail = 'sin intentos todavía · practica sin ayuda';
+    else if (st.attempted < GATE.minNotes) {
+      detail = `${st.attempted}/${GATE.minNotes} notas · ${acc}% precisión` +
+        (st.p90 ? ` · ${(st.p90 / 1000).toFixed(1)} s` : '');
+    } else detail = `${st.attempted} notas · falta: ${p.mastery.reason}`;
 
     li.innerHTML = `
       <span class="plevel-badge">${badge}</span>
@@ -248,7 +313,7 @@ function renderProgress(sessions) {
         <span class="plevel-name">${p.id}. ${p.name}</span>
         <span class="plevel-detail">${detail}</span>
       </span>
-      <span class="plevel-bar"><span class="plevel-bar-fill" style="width:${p.status === 'mastered' ? 100 : barPct}%"></span></span>
+      <span class="plevel-bar"><span class="plevel-bar-fill" style="width:${barPct}%"></span></span>
     `;
     list.appendChild(li);
   }
@@ -306,6 +371,7 @@ async function startSession() {
   $('#btn-start').hidden = true;
   $('#btn-stop').hidden = false;
   updateStats();
+  updateLiveBadge({ attempted: 0 }); // visible desde la primera nota
 }
 
 function stopSession() {
@@ -328,6 +394,7 @@ function stopSession() {
   $('#mic-status').textContent = '';
   $('#level-bar').style.width = '0%';
   if (state.keyboard) state.keyboard.clear();
+  updateLiveBadge({ attempted: 0 });
   renderGate();
 
   // Subida de nivel: si esta sesión (sin ayuda) hizo que se domine un nivel
@@ -366,7 +433,15 @@ async function runSync(quiet = true) {
   if (!quiet) status.textContent = 'Sincronizando…';
   const r = await syncNow();
   if (r.ok) {
-    status.textContent = `✓ ${r.pushed} subidas · ${r.pulled} bajadas`;
+    // "0 subidas · 0 bajadas" se leía como fallo cuando en realidad significa
+    // que ya estaba todo al día. Se informa el estado, no solo el delta.
+    const total = loadSessions().length;
+    const movimiento = [];
+    if (r.pushed) movimiento.push(`${r.pushed} subida${r.pushed > 1 ? 's' : ''}`);
+    if (r.pulled) movimiento.push(`${r.pulled} bajada${r.pulled > 1 ? 's' : ''}`);
+    status.textContent = movimiento.length
+      ? `✓ ${movimiento.join(' · ')} · ${total} sesiones en total`
+      : `✓ Todo al día · ${total} sesión${total === 1 ? '' : 'es'} guardada${total === 1 ? '' : 's'}`;
     if (r.pulled) renderGate();
   } else if (r.reason === 'offline') {
     status.textContent = 'Sin conexión — se sincroniza al volver';
@@ -454,6 +529,7 @@ function init() {
   $('#show-key').addEventListener('change', (e) => {
     state.showKey = e.target.checked;
     updateGuidance();
+    updateStats(); // el indicador debe reflejar al instante si la sesión cuenta
   });
   $('#sound-on').addEventListener('change', (e) => {
     state.synth.enabled = e.target.checked;

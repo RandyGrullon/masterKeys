@@ -43,8 +43,8 @@
         </div>
 
         <label class="help-toggle">
-          <input type="checkbox" id="show-key" checked />
-          <span>Mostrarme la tecla <em>(modo aprender)</em></span>
+          <input type="checkbox" id="show-key" />
+          <span>Mostrarme la tecla <em>⚠ así NO cuenta para tu progreso</em></span>
         </label>
 
         <label class="help-toggle">
@@ -116,6 +116,7 @@
       <!-- ── Sidebar derecho: estadísticas ── -->
       <aside class="sidebar card stats-side">
         <h2 class="side-title">Tu sesión</h2>
+        <div id="live-badge" class="live-badge idle">Sin sesión activa</div>
         <div class="stat"><span class="label">Correctas</span><span class="value" id="stat-correct">0</span></div>
         <div class="stat"><span class="label">Precisión</span><span class="value" id="stat-accuracy">—</span></div>
         <div class="stat"><span class="label">Notas/min</span><span class="value" id="stat-npm">—</span></div>
