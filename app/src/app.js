@@ -24,6 +24,7 @@ import {
 } from './music/theory.js';
 import { PianoListener } from './audio/listener.js';
 import { MidiListener } from './audio/midi.js';
+import { Synth } from './audio/synth.js';
 import { saveSession, summarize, evaluateGate, loadSessions, markSeedUsed, GATE } from './store.js';
 import { signIn, signUp, signOut, isSignedIn, userEmail } from './cloud/supabase.js';
 import { syncNow } from './cloud/sync.js';
@@ -47,6 +48,7 @@ const state = {
   listener: null,
   running: false,
   keyboard: null,
+  synth: new Synth(),
 };
 
 // ── Ejercicio ─────────────────────────────────────────────────────────
@@ -213,6 +215,7 @@ async function startSession() {
   state.events = [];
   state.startedAt = performance.now();
   state.running = true;
+  state.synth.resume(); // el clic en "Empezar" es el gesto que habilita el audio
 
   if (state.mode === 'piano') {
     try {
@@ -231,7 +234,7 @@ async function startSession() {
   } else if (state.mode === 'midi') {
     try {
       state.listener = new MidiListener({
-        onNote: ({ midi }) => submit(midi),
+        onNote: ({ midi, velocity }) => { state.synth.play(midi, velocity); submit(midi); },
         onDevice: (names) => {
           $('#midi-status').textContent = names.length
             ? `Conectado: ${names.join(', ')}`
@@ -353,7 +356,10 @@ function setMode(mode) {
 }
 
 function buildKeyboard() {
-  const onKey = state.mode === 'tap' ? (midi) => submit(midi) : null;
+  // En modo pantalla, tocar una tecla suena y cuenta como entrada.
+  const onKey = state.mode === 'tap'
+    ? (midi) => { state.synth.play(midi); submit(midi); }
+    : null;
   state.keyboard = renderKeyboard($('#piano'), KB_LO, KB_HI, onKey);
   updateGuidance();
 }
@@ -378,6 +384,10 @@ function init() {
   $('#show-key').addEventListener('change', (e) => {
     state.showKey = e.target.checked;
     updateGuidance();
+  });
+  $('#sound-on').addEventListener('change', (e) => {
+    state.synth.enabled = e.target.checked;
+    if (e.target.checked) state.synth.resume();
   });
   $('#btn-start').addEventListener('click', startSession);
   $('#btn-stop').addEventListener('click', stopSession);
