@@ -185,6 +185,68 @@ button.danger { background: var(--err); color: #fff; }
 #level-bar { height: 100%; width: 0; background: var(--ok); transition: width .06s linear; }
 .mic-status { font-size: 12.5px; color: var(--muted); }
 
+/* ── Banner de actualización ───────────────────────────────────────── */
+.update-bar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  background: var(--accent); color: #201500;
+  padding: 9px 14px; font-size: 13.5px; font-weight: 600;
+}
+.update-bar button { width: auto; padding: 6px 14px; font-size: 12.5px; background: #201500; color: var(--accent); border: 0; }
+
+/* ── Estado del plan ───────────────────────────────────────────────── */
+.plan-status {
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--card); border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-2);
+  border-radius: 10px; padding: 10px 14px; margin-top: 12px;
+}
+.plan-status strong { font-size: 13.5px; }
+.plan-status span { font-size: 12.5px; color: var(--muted); }
+.plan-status.no-piano { border-left-color: var(--accent); }
+.plan-warn { color: var(--accent) !important; font-weight: 600; }
+
+/* ── Ritmo: figuras y compases ─────────────────────────────────────── */
+.notehead.hollow { fill: var(--bg); stroke: #cdd4e6; stroke-width: 2; }
+.notehead.hollow.pending { stroke: #59617a; }
+.notehead.hollow.current { stroke: var(--accent); }
+.notehead.hollow.ok { stroke: var(--ok); }
+.notehead.hollow.error { stroke: var(--err); }
+.dot { fill: #cdd4e6; }
+.dot.pending { fill: #59617a; }
+.dot.current { fill: var(--accent); }
+.flag { fill: #cdd4e6; }
+.flag.pending { fill: #59617a; }
+.flag.current { fill: var(--accent); }
+.flag.ok { fill: var(--ok); }
+.measure-bar { stroke: #79839c; stroke-width: 1.6; }
+.timesig { fill: #cdd4e6; font-size: 15px; font-weight: 700; }
+.occluded { fill: #59617a; opacity: .28; rx: 3; }
+
+/* ── Controles extra ───────────────────────────────────────────────── */
+.level-desc { font-size: 11.5px; color: var(--muted); font-style: normal; line-height: 1.35; }
+.metro { gap: 6px; }
+.metro input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+.feedback.partial { color: var(--accent); opacity: 1; font-size: 15px; }
+
+/* ── Historial ─────────────────────────────────────────────────────── */
+.hist-card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.clef-split { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.clef-split > div {
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 10px; display: flex; flex-direction: column; gap: 3px;
+}
+.clef-split span { font-size: 11.5px; color: var(--muted); }
+.clef-split strong { font-size: 13px; }
+.clef-split .hint { grid-column: 1 / -1; }
+.hist-scroll { overflow-x: auto; }
+.hist-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.hist-table th, .hist-table td { padding: 7px 9px; text-align: left; border-bottom: 1px solid var(--line); }
+.hist-table th { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.hist-table td.muted, .muted { color: var(--muted); }
+.hint { font-size: 11.5px; color: var(--muted); margin: 0; }
+
 /* ── Sincronización en la nube ─────────────────────────────────────── */
 .sync { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .sync-title { font-size: 12px; color: var(--muted); margin: 0; font-weight: 700; letter-spacing: .3px; }

@@ -90,3 +90,68 @@ export function overallProgress(sessions) {
   const mastered = prog.filter((p) => p.status === 'mastered').length;
   return { mastered, total: LEVELS.length, pct: Math.round((mastered / LEVELS.length) * 100) };
 }
+
+/**
+ * Métricas separadas por clave. Casi todo el mundo flaquea en clave de fa y no
+ * se da cuenta porque la media global lo esconde.
+ */
+export function clefBreakdown(sessions) {
+  const out = {
+    treble: { attempted: 0, correct: 0, lat: [] },
+    bass: { attempted: 0, correct: 0, lat: [] },
+  };
+  for (const s of sessions) {
+    if (s.assisted) continue;
+    for (const e of s.events ?? []) {
+      const b = out[e.clef];
+      if (!b) continue;
+      b.attempted++;
+      if (e.correct) { b.correct++; b.lat.push(e.latencyMs); }
+    }
+  }
+  for (const k of Object.keys(out)) {
+    const b = out[k];
+    b.accuracy = b.attempted ? b.correct / b.attempted : null;
+    b.p90 = b.lat.length ? percentile(b.lat, 90) : null;
+    delete b.lat;
+  }
+  return out;
+}
+
+/** Lunes de la semana de una fecha (ISO corto), para agrupar. */
+function weekKey(dateStr) {
+  const d = new Date(dateStr);
+  const day = (d.getUTCDay() + 6) % 7; // 0 = lunes
+  d.setUTCDate(d.getUTCDate() - day);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Historial agregado por semana: lo único que muestra si de verdad mejoras.
+ * Una sesión aislada no dice nada; la tendencia sí.
+ */
+export function weeklyHistory(sessions) {
+  const weeks = new Map();
+  for (const s of sessions) {
+    if (s.assisted) continue;
+    const k = weekKey(s.date);
+    if (!weeks.has(k)) weeks.set(k, { week: k, sessions: 0, notes: 0, correct: 0, lat: [], minutes: 0 });
+    const w = weeks.get(k);
+    w.sessions++;
+    w.minutes += (s.durationMs ?? 0) / 60000;
+    for (const e of s.events ?? []) {
+      w.notes++;
+      if (e.correct) { w.correct++; w.lat.push(e.latencyMs); }
+    }
+  }
+  return [...weeks.values()]
+    .sort((a, b) => a.week.localeCompare(b.week))
+    .map((w) => ({
+      week: w.week,
+      sessions: w.sessions,
+      notes: w.notes,
+      minutes: Math.round(w.minutes),
+      accuracy: w.notes ? w.correct / w.notes : null,
+      p90: w.lat.length ? percentile(w.lat, 90) : null,
+    }));
+}

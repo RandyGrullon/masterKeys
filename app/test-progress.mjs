@@ -111,7 +111,9 @@ console.log('\n=== overallProgress ===');
   eq('0 de 5 al empezar', overallProgress([]).mastered, 0);
   const dominaNivel1 = [mkSession({ level: 1, n: GATE.minNotes, accuracy: 1, latencyMs: 900 })];
   eq('1 de 5 tras dominar el primero', overallProgress(dominaNivel1).mastered, 1);
-  eq('20% de 5 niveles', overallProgress(dominaNivel1).pct, 20);
+  // Independiente del número de niveles: la escalera crece con las fases del plan.
+  eq(`1/${LEVELS.length} niveles en porcentaje`, overallProgress(dominaNivel1).pct,
+    Math.round((1 / LEVELS.length) * 100));
 }
 
 console.log(`\n${pass} ok, ${fail} fallan\n`);

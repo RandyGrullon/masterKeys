@@ -22,11 +22,14 @@ import {
   describeMidi, matchesExpected,
   describeStaffPosition, describeInterval, nearestAnchor,
 } from './music/theory.js';
+import { describeDuration, timingError, inTime } from './music/rhythm.js';
 import { PianoListener } from './audio/listener.js';
 import { MidiListener } from './audio/midi.js';
 import { Synth } from './audio/synth.js';
+import { Metronome } from './audio/metronome.js';
 import { saveSession, summarize, evaluateGate, loadSessions, markSeedUsed, GATE } from './store.js';
-import { fullProgress, overallProgress, recommendedLevel } from './progress.js';
+import { fullProgress, overallProgress, recommendedLevel, weeklyHistory, clefBreakdown } from './progress.js';
+import { planStatus } from './plan.js';
 import { signIn, signUp, signOut, isSignedIn, userEmail } from './cloud/supabase.js';
 import { syncNow } from './cloud/sync.js';
 
@@ -53,6 +56,15 @@ const state = {
   running: false,
   keyboard: null,
   synth: new Synth(),
+  // Ritmo
+  metronome: null,
+  bpm: 60,
+  useMetronome: false,
+  // Anticipación ojo-mano
+  anticipate: false,
+  // Notas ya acertadas del evento actual (para acordes y dos manos)
+  pending: new Set(),
+  autosaveTimer: null,
 };
 
 // ── Ejercicio ─────────────────────────────────────────────────────────
@@ -60,88 +72,132 @@ function newExercise() {
   const seed = Date.now() ^ Math.floor(Math.random() * 0xffff);
   markSeedUsed(seed);
   state.exercise = generateExercise(state.level, seed);
-  state.states = state.exercise.notes.map((_, i) => (i === 0 ? 'current' : 'pending'));
+  state.states = state.exercise.events.map((_, i) => (i === 0 ? 'current' : 'pending'));
   state.index = 0;
+  state.pending = new Set(); // notas ya acertadas del evento actual (acordes)
   state.noteShownAt = performance.now();
   draw();
 }
 
+/** Evento actual del ejercicio (una nota, un acorde, o dos manos). */
+function currentEvent() {
+  return state.exercise?.events[state.index] ?? null;
+}
+
 function draw() {
-  renderExercise($('#score'), state.exercise, state.states);
+  // Modo anticipación: se oculta desde 2 eventos por delante, obligando a leer
+  // adelantado — el mecanismo real de la lectura a primera vista.
+  const occludeFrom = state.anticipate ? state.index + 2 : Infinity;
+  const { xOfEvent } = renderExercise($('#score'), state.exercise, state.states, { occludeFrom });
   const scoreEl = $('#score');
-  const x = 96 + state.index * 62;
+  const x = xOfEvent(state.index);
   scoreEl.scrollTo({ left: Math.max(0, x - scoreEl.clientWidth / 2), behavior: 'smooth' });
   updateGuidance();
 }
 
 /** Actualiza el piano resaltado y el panel de lógica de lectura. */
 function updateGuidance() {
-  const note = state.exercise?.notes[state.index];
+  const event = currentEvent();
   const kb = state.keyboard;
   if (kb) {
     kb.clear();
-    if (note && state.showKey) kb.mark(note.midi, 'target');
-    if (note) {
-      const x = kb.xOf(note.midi);
+    if (event) {
+      // Con ayuda se iluminan TODAS las notas del evento (acorde incluido),
+      // menos las que ya acertaste.
+      if (state.showKey) {
+        for (const n of event.notes) {
+          if (!state.pending.has(n.midi)) kb.mark(n.midi, 'target');
+        }
+      }
+      const first = event.notes[0];
+      const x = first && kb.xOf(first.midi);
       if (x != null) {
         const el = $('#piano');
         el.scrollTo({ left: Math.max(0, x - el.clientWidth / 2), behavior: 'smooth' });
       }
     }
   }
-  renderLiteracy(note);
+  renderLiteracy(event);
 }
 
-/** Panel "lógica de lectura": explica la nota actual en palabras. */
-function renderLiteracy(note) {
+/** Panel "lógica de lectura": explica el evento actual en palabras. */
+function renderLiteracy(event) {
   const box = $('#literacy');
-  if (!note) { box.hidden = true; return; }
+  if (!event) { box.hidden = true; return; }
   box.hidden = false;
 
-  const info = describeMidi(note.midi);
-  $('#lit-name').textContent = info.nameEs;
+  const notes = event.notes;
+  const fig = describeDuration(event.duration);
 
-  const anc = nearestAnchor(note.midi);
-  $('#lit-anchor').textContent = anc.isAnchor
-    ? '★ es una de tus 4 anclas'
-    : `a ${anc.distance} ${anc.distance === 1 ? 'grado' : 'grados'} de ${describeMidi(anc.anchor.midi).nameEs} (ancla)`;
+  // En un acorde o dos manos se nombran todas las notas que faltan.
+  const missing = notes.filter((n) => !state.pending.has(n.midi));
+  const names = missing.map((n) => describeMidi(n.midi).nameEs);
+  $('#lit-name').textContent = names.join(' + ') || '✓';
 
-  $('#lit-staff').textContent = describeStaffPosition(note.midi, note.clef);
+  if (notes.length > 1) {
+    const hands = new Set(notes.map((n) => n.clef));
+    $('#lit-anchor').textContent = hands.size > 1
+      ? `${notes.length} notas · dos manos a la vez`
+      : `acorde de ${notes.length} notas`;
+  } else {
+    const anc = nearestAnchor(notes[0].midi);
+    $('#lit-anchor').textContent = anc.isAnchor
+      ? '★ es una de tus 4 anclas'
+      : `a ${anc.distance} ${anc.distance === 1 ? 'grado' : 'grados'} de ${describeMidi(anc.anchor.midi).nameEs} (ancla)`;
+  }
 
-  const groupHint = info.nameEs.startsWith('DO')
-    ? 'a la izquierda del grupo de 2 negras'
-    : info.nameEs.startsWith('FA')
-      ? 'a la izquierda del grupo de 3 negras'
-      : 'tecla blanca';
-  $('#lit-key').textContent = state.showKey
-    ? `iluminada en el piano — ${groupHint}`
-    : `búscala en el piano: ${groupHint}`;
+  $('#lit-staff').textContent = missing.length
+    ? describeStaffPosition(missing[0].midi, missing[0].clef)
+    : 'evento completo';
 
-  // Intervalo desde la nota anterior — la Lección 3 del plan.
-  if (state.index > 0) {
-    const prev = state.exercise.notes[state.index - 1];
-    const iv = describeInterval(prev.midi, note.midi);
+  // Figura y conteo — la parte de ritmo, que antes no existía.
+  $('#lit-key').textContent = `${fig.name}${fig.count ? ` · cuenta «${fig.count}»` : ''}`;
+
+  // Intervalo desde el evento anterior — la Lección 3 del plan.
+  const prevEvent = state.index > 0 ? state.exercise.events[state.index - 1] : null;
+  if (prevEvent && notes.length === 1 && prevEvent.notes.length === 1) {
+    const iv = describeInterval(prevEvent.notes[0].midi, notes[0].midi);
     $('#lit-interval').textContent = iv.steps === 0
       ? 'la misma nota que la anterior'
-      : `${iv.number} ${iv.dir} desde ${describeMidi(prev.midi).nameEs} — ${iv.shape}`;
+      : `${iv.number} ${iv.dir} desde ${describeMidi(prevEvent.notes[0].midi).nameEs} — ${iv.shape}`;
+  } else if (prevEvent) {
+    $('#lit-interval').textContent = `compás ${event.measure + 1}, tiempo ${event.beatInMeasure + 1}`;
   } else {
     $('#lit-interval').textContent = 'primera nota: nómbrala; las siguientes, léelas por distancia';
   }
 }
 
-function expectedNote() {
-  return state.exercise.notes[state.index];
-}
-
+/**
+ * Registra una nota tocada.
+ *
+ * Con acordes o dos manos hay que acumular: el evento no avanza hasta que todas
+ * sus notas estén tocadas. El orden dentro del evento no importa (un acorde no
+ * tiene orden), y tocar dos veces la misma nota no cuenta doble.
+ */
 function submit(midi) {
   if (!state.running || !state.exercise) return;
-  const expected = expectedNote();
-  const correct = matchesExpected(midi, expected.midi, false);
+  const event = currentEvent();
+  if (!event) return;
+
+  const targets = event.notes.map((n) => n.midi);
+  const hit = targets.find((t) => matchesExpected(midi, t, false) && !state.pending.has(t));
+  const correct = hit !== undefined;
   const latencyMs = performance.now() - state.noteShownAt;
 
+  // Desviación rítmica: solo tiene sentido si el metrónomo va marcando.
+  const rhythmError = state.metronome?.running
+    ? timingError(event.absoluteBeat, performance.now(), state.metronome.startedAtMs, state.bpm)
+    : null;
+
   state.events.push({
-    expected: expected.midi, played: midi, correct, latencyMs,
-    clef: expected.clef, at: Date.now(),
+    expected: correct ? hit : targets[0],
+    played: midi,
+    correct,
+    latencyMs,
+    clef: (event.notes.find((n) => n.midi === hit) ?? event.notes[0]).clef,
+    duration: event.duration,
+    rhythmErrorMs: rhythmError,
+    at: Date.now(),
   });
 
   if (state.keyboard) {
@@ -151,15 +207,24 @@ function submit(midi) {
   }
 
   if (correct) {
-    state.states[state.index] = 'ok';
-    state.index++;
-    if (state.index >= state.exercise.notes.length) newExercise();
-    else {
-      state.states[state.index] = 'current';
-      state.noteShownAt = performance.now();
-      draw();
+    state.pending.add(hit);
+    const complete = targets.every((t) => state.pending.has(t));
+    if (complete) {
+      state.states[state.index] = 'ok';
+      state.index++;
+      state.pending = new Set();
+      if (state.index >= state.exercise.events.length) newExercise();
+      else {
+        state.states[state.index] = 'current';
+        state.noteShownAt = performance.now();
+        draw();
+      }
+      flash('ok');
+    } else {
+      // Acorde a medias: se refresca la guía para tachar lo ya tocado.
+      updateGuidance();
+      flash('partial', `faltan ${targets.length - state.pending.size}`);
     }
-    flash('ok');
   } else {
     state.states[state.index] = 'error';
     draw();
@@ -177,7 +242,9 @@ function submit(midi) {
 function flash(kind, text = '') {
   const el = $('#feedback');
   el.className = `feedback ${kind}`;
-  el.textContent = kind === 'ok' ? '✓' : `✕ ${text}`;
+  // 'partial' es un acierto a medias (acorde incompleto), no un error: marcarlo
+  // con ✕ haría creer que la nota estuvo mal.
+  el.textContent = kind === 'ok' ? '✓' : kind === 'partial' ? `◓ ${text}` : `✕ ${text}`;
   clearTimeout(flash._t);
   flash._t = setTimeout(() => { el.className = 'feedback'; el.textContent = ''; }, 600);
 }
@@ -368,15 +435,64 @@ async function startSession() {
   }
 
   newExercise();
+
+  // Metrónomo: el plan lo llama obligatorio. Sin referencia externa de pulso,
+  // el alumno ajusta el tempo a lo que le sale y fosiliza el error.
+  if (state.useMetronome) {
+    state.metronome = new Metronome({ bpm: state.bpm, beatsPerMeasure: state.exercise.beatsPerMeasure });
+    state.metronome.start();
+  }
+
+  // Autoguardado: sin esto, cerrar la app sin pulsar "Terminar" perdía toda la
+  // práctica. Se guarda un borrador cada 20 s y se limpia al terminar bien.
+  state.autosaveTimer = setInterval(() => autosaveDraft(), 20000);
+
   $('#btn-start').hidden = true;
   $('#btn-stop').hidden = false;
   updateStats();
   updateLiveBadge({ attempted: 0 }); // visible desde la primera nota
 }
 
+const DRAFT_KEY = 'piano-trainer:draft:v1';
+
+/** Guarda un borrador de la sesión en curso, por si la app se cierra. */
+function autosaveDraft() {
+  if (!state.running || !state.events.length) return;
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      date: new Date().toISOString(),
+      mode: state.mode,
+      assisted: state.showKey,
+      level: state.level,
+      durationMs: performance.now() - state.startedAt,
+      events: state.events,
+    }));
+  } catch { /* cuota llena: no es crítico */ }
+}
+
+/**
+ * Recupera un borrador de una sesión que quedó sin cerrar (la app se cerró a
+ * media práctica). Se guarda como sesión real para no perder el trabajo.
+ */
+function recoverDraft() {
+  let draft;
+  try {
+    draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
+  } catch { draft = null; }
+  localStorage.removeItem(DRAFT_KEY);
+  if (draft?.events?.length) {
+    saveSession(draft);
+    return draft.events.length;
+  }
+  return 0;
+}
+
 function stopSession() {
   state.running = false;
   if (state.listener) { state.listener.stop(); state.listener = null; }
+  if (state.metronome) { state.metronome.stop(); state.metronome = null; }
+  if (state.autosaveTimer) { clearInterval(state.autosaveTimer); state.autosaveTimer = null; }
+  localStorage.removeItem(DRAFT_KEY); // se cerró bien: el borrador ya no hace falta
   const durationMs = performance.now() - state.startedAt;
   const prevRecommended = recommendedLevel(loadSessions());
   if (state.events.length) {
@@ -396,6 +512,7 @@ function stopSession() {
   if (state.keyboard) state.keyboard.clear();
   updateLiveBadge({ attempted: 0 });
   renderGate();
+  renderHistoryPanel(); // la evolución semanal y el desglose por clave cambiaron
 
   // Subida de nivel: si esta sesión (sin ayuda) hizo que se domine un nivel
   // nuevo, se avanza el selector y se celebra con un pequeño arpegio.
@@ -446,7 +563,12 @@ async function runSync(quiet = true) {
   } else if (r.reason === 'offline') {
     status.textContent = 'Sin conexión — se sincroniza al volver';
   } else if (r.reason === 'error') {
-    status.textContent = `Error: ${r.message}`;
+    // El fallo más probable la primera vez: la tabla no existe todavía porque
+    // no se corrió supabase-setup.sql. Decirlo explícitamente ahorra un rato
+    // de desconcierto frente a un mensaje crudo de PostgREST.
+    status.textContent = /Could not find the table|PGRST205|schema cache/i.test(r.message ?? '')
+      ? 'Falta crear la tabla: corre supabase-setup.sql en Supabase → SQL Editor'
+      : `Error: ${r.message}`;
   } else if (!quiet) {
     status.textContent = '';
   }
@@ -509,17 +631,83 @@ function buildKeyboard() {
   updateGuidance();
 }
 
+// ── Estado del plan e historial ───────────────────────────────────────
+
+const PHASE_LABEL = { 1: 'Fase 1 · Alfabetización', 2: 'Fase 2 · Puente técnico', 3: 'Fase 3 · Bemoles' };
+
+/** Cabecera con la semana del plan y la fase que toca hoy. */
+function renderPlan() {
+  const p = planStatus();
+  const box = $('#plan-status');
+  if (!box) return;
+  if (p.after) {
+    box.innerHTML = '<strong>Plan completado</strong><span>El 29 de noviembre ya pasó.</span>';
+    return;
+  }
+  const name = p.phase?.name ?? '—';
+  const goal = p.phase?.goal ?? '';
+  box.className = `plan-status${p.noPiano ? ' no-piano' : ''}`;
+  box.innerHTML =
+    `<strong>Semana ${p.week} de ${p.totalWeeks} · ${name}</strong>` +
+    `<span>${goal}${p.daysLeft >= 0 ? ` · ${p.daysLeft} días hasta el 29 nov` : ''}</span>` +
+    (p.noPiano ? '<span class="plan-warn">Estás en el tramo sin piano: usa «Toco en pantalla», 15 min/día.</span>' : '');
+}
+
+/** Historial semanal + desglose por clave. */
+function renderHistoryPanel() {
+  const sessions = loadSessions();
+  const weeks = weeklyHistory(sessions);
+  const tbody = $('#hist-body');
+  if (tbody) {
+    tbody.innerHTML = weeks.length
+      ? weeks.slice(-8).reverse().map((w) => `
+          <tr>
+            <td>${w.week}</td>
+            <td>${w.sessions}</td>
+            <td>${w.notes}</td>
+            <td>${w.accuracy != null ? Math.round(w.accuracy * 100) + '%' : '—'}</td>
+            <td>${w.p90 != null ? (w.p90 / 1000).toFixed(1) + ' s' : '—'}</td>
+          </tr>`).join('')
+      : '<tr><td colspan="5" class="muted">Sin semanas registradas (solo cuentan las sesiones sin ayuda)</td></tr>';
+  }
+
+  const cb = clefBreakdown(sessions);
+  const fmt = (b) => b.attempted
+    ? `${Math.round(b.accuracy * 100)}% · ${b.p90 != null ? (b.p90 / 1000).toFixed(1) + ' s' : '—'} · ${b.attempted} notas`
+    : 'sin datos';
+  const el = $('#clef-split');
+  if (el) {
+    el.innerHTML =
+      `<div><span>Clave de sol</span><strong>${fmt(cb.treble)}</strong></div>` +
+      `<div><span>Clave de fa</span><strong>${fmt(cb.bass)}</strong></div>`;
+    // La clave de fa es donde casi todos flaquean; se señala si va peor.
+    const worse = cb.treble.accuracy != null && cb.bass.accuracy != null && cb.bass.accuracy < cb.treble.accuracy - 0.08;
+    if (worse) el.innerHTML += '<p class="hint">Tu clave de fa va por detrás — normal, y merece práctica extra.</p>';
+  }
+}
+
 // ── Arranque ──────────────────────────────────────────────────────────
 function init() {
+  // Selector agrupado por fase del plan, no una lista plana de 12.
   const sel = $('#level');
+  let currentPhase = null;
+  let group = null;
   LEVELS.forEach((l) => {
+    if (l.phase !== currentPhase) {
+      currentPhase = l.phase;
+      group = document.createElement('optgroup');
+      group.label = PHASE_LABEL[l.phase] ?? `Fase ${l.phase}`;
+      sel.appendChild(group);
+    }
     const opt = document.createElement('option');
     opt.value = l.id;
-    opt.textContent = `${l.id}. ${l.name} — ${l.description}`;
-    sel.appendChild(opt);
+    opt.textContent = `${l.id}. ${l.name}`;
+    opt.title = l.description;
+    group.appendChild(opt);
   });
   sel.addEventListener('change', () => {
     state.level = Number(sel.value);
+    $('#level-desc').textContent = LEVELS.find((l) => l.id === state.level)?.description ?? '';
     if (state.running) newExercise();
   });
 
@@ -535,6 +723,23 @@ function init() {
     state.synth.enabled = e.target.checked;
     if (e.target.checked) state.synth.resume();
   });
+  $('#anticipate').addEventListener('change', (e) => {
+    state.anticipate = e.target.checked;
+    draw();
+  });
+  $('#metro-on').addEventListener('change', (e) => {
+    state.useMetronome = e.target.checked;
+    if (!e.target.checked && state.metronome) { state.metronome.stop(); state.metronome = null; }
+    else if (e.target.checked && state.running) {
+      state.metronome = new Metronome({ bpm: state.bpm, beatsPerMeasure: state.exercise.beatsPerMeasure });
+      state.metronome.start();
+    }
+  });
+  $('#bpm').addEventListener('input', (e) => {
+    state.bpm = Number(e.target.value);
+    $('#bpm-label').textContent = `${state.bpm} bpm`;
+    if (state.metronome) state.metronome.bpm = state.bpm;
+  });
   $('#btn-start').addEventListener('click', startSession);
   $('#btn-stop').addEventListener('click', stopSession);
 
@@ -543,20 +748,71 @@ function init() {
   // Enganche de depuración: simular sesiones sin micrófono ni clics.
   window.__piano = { state, submit };
 
+  // Rescata práctica de una sesión que quedó sin cerrar.
+  const recovered = recoverDraft();
+
   // Arranca en el nivel recomendado según el progreso guardado, no siempre en 1:
   // quien ya domina las anclas no debería tener que bajar el selector cada vez.
   state.level = recommendedLevel(loadSessions());
   sel.value = String(state.level);
+  $('#level-desc').textContent = LEVELS.find((l) => l.id === state.level)?.description ?? '';
 
   state.exercise = generateExercise(state.level, Date.now());
-  state.states = state.exercise.notes.map((_, i) => (i === 0 ? 'current' : 'pending'));
+  state.states = state.exercise.events.map((_, i) => (i === 0 ? 'current' : 'pending'));
   buildKeyboard();
   draw();
   renderGate();
+  renderPlan();
+  renderHistoryPanel();
+  updateLiveBadge({ attempted: 0 });
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if (recovered) {
+    const el = $('#feedback');
+    el.className = 'feedback ok';
+    el.textContent = `Recuperadas ${recovered} notas`;
+    setTimeout(() => { el.className = 'feedback'; el.textContent = ''; }, 2500);
   }
+
+  registerServiceWorker();
+}
+
+/**
+ * Registra el service worker y avisa cuando hay una versión nueva.
+ * Antes había que cerrar y reabrir la app a mano para ver los cambios, porque
+ * la estrategia es cache-first y el SW viejo seguía sirviendo.
+ */
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    reg.addEventListener('updatefound', () => {
+      const nw = reg.installing;
+      if (!nw) return;
+      nw.addEventListener('statechange', () => {
+        // 'installed' con un SW ya controlando = hay versión nueva esperando.
+        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateBanner(reg);
+        }
+      });
+    });
+  }).catch(() => {});
+
+  // Cuando el SW nuevo toma el control, recargar una sola vez.
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+}
+
+function showUpdateBanner(reg) {
+  const bar = $('#update-bar');
+  if (!bar) return;
+  bar.hidden = false;
+  $('#update-now').onclick = () => {
+    reg.waiting?.postMessage({ type: 'SKIP_WAITING' });
+    bar.hidden = true;
+  };
 }
 
 document.addEventListener('DOMContentLoaded', init);

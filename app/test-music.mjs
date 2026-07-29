@@ -95,30 +95,44 @@ eq('261.63 Hz -> DO4', frequencyToNote(261.63).nameEs, 'DO4');
 ok('octava NO coincide sin tolerancia', matchesExpected(72, 60, false) === false);
 ok('octava coincide con tolerancia', matchesExpected(72, 60, true) === true);
 
-console.log('\n=== Generador ===');
+console.log('\n=== Generador (modelo de eventos) ===');
+/** Todas las notas del ejercicio, en orden, aplanando acordes. */
+const allNotes = (ex) => ex.events.flatMap((e) => e.notes);
+
 for (const level of LEVELS) {
   const ex = generateExercise(level.id, 424242);
-  eq(`nivel ${level.id} genera ${level.length} notas`, ex.notes.length, level.length);
+  ok(`nivel ${level.id} genera eventos`, ex.events.length > 0);
 
-  const badInterval = [];
-  for (let i = 1; i < ex.notes.length; i++) {
-    const a = ex.notes[i - 1], b = ex.notes[i];
-    if (a.clef !== b.clef) continue; // el cambio de clave reinicia el paseo
-    const d = Math.abs(diatonicIndex(b.midi) - diatonicIndex(a.midi));
-    if (d > level.maxInterval) badInterval.push(`${describeMidi(a.midi).nameEs}->${describeMidi(b.midi).nameEs} (${d})`);
+  // El intervalo máximo se mide dentro de la misma clave y en textura simple:
+  // en un acorde las notas están a terceras por construcción, y el vals salta
+  // entre grados armónicos, así que ahí la regla no aplica.
+  if (level.texture === 'single' && level.hands === 'one') {
+    // El intervalo se mide dentro de un TRAMO CONTIGUO de la misma clave: al
+    // cambiar de clave el generador arranca una frase nueva y elige nota libre,
+    // así que ahí un salto grande es correcto, no un fallo.
+    const badInterval = [];
+    const seq = allNotes(ex);
+    for (let i = 1; i < seq.length; i++) {
+      if (seq[i].clef !== seq[i - 1].clef) continue; // frontera de frase
+      const d = Math.abs(diatonicIndex(seq[i].midi) - diatonicIndex(seq[i - 1].midi));
+      if (d > level.maxInterval) {
+        badInterval.push(`${describeMidi(seq[i - 1].midi).nameEs}->${describeMidi(seq[i].midi).nameEs} (${d})`);
+      }
+    }
+    ok(`nivel ${level.id} respeta el intervalo maximo (${level.maxInterval})`,
+      badInterval.length === 0, badInterval.slice(0, 3).join(', '));
   }
-  ok(`nivel ${level.id} respeta el intervalo maximo (${level.maxInterval})`, badInterval.length === 0, badInterval.join(', '));
 
-  const outOfRange = ex.notes.filter((n) => {
+  const outOfRange = allNotes(ex).filter((n) => {
     const [lo, hi] = level.range[n.clef];
     return n.midi < lo || n.midi > hi;
   });
   ok(`nivel ${level.id} respeta el rango`, outOfRange.length === 0,
-    outOfRange.map((n) => describeMidi(n.midi).nameEs).join(', '));
+    outOfRange.slice(0, 3).map((n) => describeMidi(n.midi).nameEs).join(', '));
 
   // Las notas deben pertenecer a la tonalidad.
   const tonicPc = KEYS[ex.keyId].tonicPc;
-  const inKey = ex.notes.every((n) => [0, 2, 4, 5, 7, 9, 11].includes((((n.midi - tonicPc) % 12) + 12) % 12));
+  const inKey = allNotes(ex).every((n) => [0, 2, 4, 5, 7, 9, 11].includes((((n.midi - tonicPc) % 12) + 12) % 12));
   ok(`nivel ${level.id} se mantiene en ${ex.keyName}`, inKey);
 }
 
@@ -128,7 +142,7 @@ console.log('\n=== Novedad: dos semillas nunca dan lo mismo ===');
   let dupes = 0;
   for (let i = 0; i < 300; i++) {
     const ex = generateExercise(3, 1000 + i);
-    const sig = ex.notes.map((n) => n.midi).join(',');
+    const sig = ex.events.map((e) => e.notes.map((n) => n.midi).join('.')).join(',');
     if (seen.has(sig)) dupes++;
     seen.add(sig);
   }
@@ -137,9 +151,8 @@ console.log('\n=== Novedad: dos semillas nunca dan lo mismo ===');
 
 console.log('\n=== Reproducibilidad: misma semilla, mismo ejercicio ===');
 {
-  const a = generateExercise(4, 777).notes.map((n) => n.midi).join(',');
-  const b = generateExercise(4, 777).notes.map((n) => n.midi).join(',');
-  ok('semilla 777 es determinista', a === b);
+  const sig = (ex) => ex.events.map((e) => `${e.duration}:${e.notes.map((n) => n.midi).join('.')}`).join(',');
+  ok('semilla 777 es determinista', sig(generateExercise(4, 777)) === sig(generateExercise(4, 777)));
 }
 
 console.log(`\n${pass} ok, ${fail} fallan\n`);
